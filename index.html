@@ -771,6 +771,11 @@
                     <input type="text" id="p-naam" placeholder="Bijv. Zaalvoetbal Toernooi">
                 </div>
 
+                <div class="form-group">
+                    <label>Verantwoordelijke docent</label>
+                    <input type="text" id="p-docent" placeholder="Bijv. Dhr. Jansen">
+                </div>
+
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                     <div class="form-group">
                         <label>Tijd</label>
@@ -1083,6 +1088,7 @@
             week: parseInt(document.getElementById('p-week').value),
             dag: parseInt(document.getElementById('p-dag').value),
             naam: document.getElementById('p-naam').value,
+            docent: document.getElementById('p-docent').value.trim(),
             tijd: document.getElementById('p-tijd').value,
             loc: document.getElementById('p-loc').value,
             info: document.getElementById('p-info').value,
@@ -1118,6 +1124,7 @@
         document.getElementById('p-week').value = p.week;
         document.getElementById('p-dag').value = p.dag;
         document.getElementById('p-naam').value = p.naam;
+        document.getElementById('p-docent').value = p.docent || '';
         document.getElementById('p-tijd').value = p.tijd || '';
         document.getElementById('p-loc').value = p.loc || '';
         document.getElementById('p-info').value = p.info || '';
@@ -1187,6 +1194,7 @@
     function resetForm() {
         document.getElementById('edit-id').value = '';
         document.getElementById('p-naam').value = '';
+        document.getElementById('p-docent').value = '';
         document.getElementById('p-tijd').value = '';
         document.getElementById('p-loc').value = '';
         document.getElementById('p-info').value = '';
@@ -1201,7 +1209,7 @@
         document.querySelectorAll('input[name="p-classes"]').forEach(cb => cb.checked = false);
     }
 
-    // EXCEL IMPORT MET CONCEPT STATUS
+    // EXCEL IMPORT MET DOCENT EN CONCEPT STATUS
     async function importExcel() {
         const fileInput = document.getElementById('excel-file-input');
         const file = fileInput.files[0];
@@ -1283,8 +1291,11 @@
                         isConcept = false;
                     }
 
+                    const docentVal = row[getKey('verantwoordelijke docent') || getKey('docent') || getKey('docenten') || ''];
+
                     projectsToUpload.push({
                         naam: String(naam),
+                        docent: String(docentVal || ''),
                         week: week,
                         dag: dag,
                         classes: rowClasses,
@@ -1349,6 +1360,7 @@
                     <div class="project-stub-meta">
                         <span>🕒 ${p.tijd || 'TBA'}</span>
                         <span>📍 ${p.loc || 'TBA'}</span>
+                        ${p.docent ? `<span>👤 ${p.docent}</span>` : ''}
                     </div>
                     ${isAdmin ? `
                         <div class="admin-actions">
@@ -1374,6 +1386,10 @@
             </div>
             
             <div class="detail-meta-box">
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Verantwoordelijke docent</span>
+                    <span class="detail-meta-value">${p.docent || 'Niet opgegeven'}</span>
+                </div>
                 <div class="detail-meta-item">
                     <span class="detail-meta-label">Tijd</span>
                     <span class="detail-meta-value">${p.tijd || 'Niet opgegeven'}</span>
