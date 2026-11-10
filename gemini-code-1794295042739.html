@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mondriaan Lifestyle, Sport en bewegen - Projectplanner</title>
+    <!-- Google Fonts & Arial Fallback -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- SheetJS voor Excel Import -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            /* Officiële ROC Mondriaan Huisstijl Kleuren */
+            --primary: #002355;          /* Mondriaan Deep Navy */
+            --primary-hover: #001738;    /* Mondriaan Darker Navy */
+            --accent: #0050AA;           /* Mondriaan Royal Blue */
+            --accent-hover: #003c80;     /* Darker Royal Blue */
+            --accent-light: #B9DCFF;     /* Mondriaan Soft Sky Blue */
+            --mondriaan-red: #E6002D;    /* Mondriaan Red Accent */
+            --mondriaan-yellow: #FDD200; /* Mondriaan Yellow Accent */
+            --mondriaan-green: #46C891;  /* Mondriaan Green Accent */
+            
+            --bg-main: #f4f6f9;          /* Canvas Background */
+            --surface: #ffffff;         /* Card Surface */
+            --border: #e0e4eb;          /* Border slate */
+            --border-dark: #c5cbd5;     /* Darker border slate */
+            --text-main: #002355;       /* Text Main Navy */
+            --text-muted: #55657e;      /* Muted Navy-Gray */
+            
+            --badge-choice: #b38600;     /* Amber Badge Text */
+            --badge-choice-bg: #fff8d6;  /* Soft Yellow Badge */
+            --badge-concept: #c2410c;    /* Orange Concept Badge */
+            --badge-concept-bg: #ffedd5;
+            --badge-definitief: #047857; /* Green Definitief Badge */
+            --badge-definitief-bg: #d1fae5;
+            
+            --danger: #E6002D;           /* Mondriaan Red */
+            --success: #10b981;          /* Green for success */
+            
+            --shadow-sm: 0 2px 4px rgba(0, 35, 85, 0.06);
+            --shadow-md: 0 4px 10px rgba(0, 35, 85, 0.08);
+            --shadow-lg: 0 10px 25px rgba(0, 35, 85, 0.12);
+            --radius-md: 8px;
+            --radius-lg: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body { 
+            font-family: Arial, 'Inter', system-ui, -apple-system, sans-serif; 
+            background: var(--bg-main); 
+            color: var(--text-main); 
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        /* Header in Mondriaan Huisstijl */
+        header { 
+            background: var(--surface); 
+            border-bottom: 3px solid var(--accent); 
+            padding: 1rem 2.5rem; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            position: sticky; 
+            top: 0; 
+            z-index: 900;
+            box-shadow: var(--shadow-sm);
+            flex-wrap: wrap;
+            gap: 1.25rem;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+        
+        #logo-container img { 
+            max-height: 55px; 
+            max-width: 220px; 
+            object-fit: contain; 
+            display: block;
+        }
+
+        .header-titles h1 { 
+            font-size: 1.45rem; 
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            color: var(--primary);
+            line-height: 1.2;
+        }
+
+        .header-titles span { 
+            font-weight: 700; 
+            font-size: 0.8rem; 
+            color: var(--accent); 
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .filter-box { 
+            background: #eef5fc; 
+            padding: 0.55rem 1.1rem; 
+            border: 1px solid var(--accent-light); 
+            border-radius: var(--radius-md);
+            font-weight: 700;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--primary);
+        }
+
+        .filter-box select { 
+            border: none; 
+            background: transparent; 
+            font-weight: 800; 
+            cursor: pointer; 
+            font-size: 0.875rem;
+            outline: none;
+            color: var(--accent);
+            font-family: inherit;
+        }
+
+        .container { 
+            padding: 2.5rem; 
+            max-width: 1350px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+        }
+
+        /* Dashboard (Admin) */
+        #admin-panel { 
+            display: none; 
+            background: var(--surface); 
+            border: 1px solid var(--border); 
+            border-top: 4px solid var(--mondriaan-red);
+            border-radius: var(--radius-lg);
+            padding: 2rem; 
+            margin-bottom: 2.5rem;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--bg-main);
+        }
+
+        .admin-header h2 {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .admin-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1.6fr; 
+            gap: 2.5rem; 
+        }
+
+        @media (max-width: 900px) {
+            .admin-grid { grid-template-columns: 1fr; }
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 700;
+            font-size: 0.775rem;
+            margin-bottom: 0.35rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+        }
+
+        input[type="text"], input[type="number"], textarea, select, input[type="file"] { 
+            width: 100%; 
+            padding: 0.65rem 0.875rem; 
+            border: 1px solid var(--border-dark); 
+            border-radius: 6px;
+            font-weight: 500; 
+            font-family: inherit;
+            background: var(--surface);
+            color: var(--text-main);
+            transition: all 0.15s ease-in-out;
+            font-size: 0.925rem;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 80, 170, 0.15);
+        }
+
+        .btn { 
+            padding: 0.75rem 1.5rem; 
+            border-radius: 6px;
+            font-weight: 700; 
+            font-size: 0.875rem;
+            cursor: pointer; 
+            transition: all 0.15s ease; 
+            border: 1px solid transparent;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn:hover { 
+            transform: translateY(-1px); 
+            box-shadow: var(--shadow-md); 
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary { background: var(--primary); color: var(--surface); }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: #f1f4f8; color: var(--text-main); border-color: var(--border); }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .btn-accent { background: var(--accent); color: var(--surface); }
+        .btn-accent:hover { background: var(--accent-hover); }
+        .btn-success { background: var(--success); color: var(--surface); }
+        .btn-success:hover { background: #059669; }
+        .btn-warning { background: var(--badge-concept); color: var(--surface); }
+        .btn-warning:hover { background: #c2410c; }
+
+        .excel-import-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+        }
+
+        .excel-import-box h4 {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #166534;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .publish-all-box {
+            background: #fff7ed;
+            border: 1px solid #ffedd5;
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .publish-all-box h4 {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #c2410c;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Klas Filter Melding Banner */
+        .class-active-banner {
+            background: #eef5fc;
+            border: 1px solid var(--accent-light);
+            border-left: 4px solid var(--accent);
+            border-radius: var(--radius-md);
+            padding: 0.85rem 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.925rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .class-active-banner strong {
+            color: var(--accent);
+            font-weight: 800;
+        }
+
+        .class-badge-pill {
+            background: var(--primary);
+            color: var(--surface);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.775rem;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+        }
+
+        /* Weken Grid Cards met Mondriaan Accentlijn */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        #week-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); 
+            gap: 1.5rem; 
+        }
+
+        .week-card { 
+            background: var(--surface); 
+            min-height: 200px; 
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.75rem; 
+            cursor: pointer; 
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between;
+            position: relative; 
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+
+        .week-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, var(--primary), var(--accent), var(--mondriaan-red));
+        }
+
+        .week-card:hover { 
+            transform: translateY(-4px); 
+            box-shadow: var(--shadow-lg);
+            border-color: var(--accent);
+        }
+
+        .week-card h2 { 
+            font-size: 2.25rem; 
+            margin: 0.35rem 0; 
+            font-weight: 800; 
+            color: var(--primary);
+            letter-spacing: -0.03em;
+        }
+
+        .week-date { 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            color: var(--accent); 
+            font-size: 0.775rem;
+            letter-spacing: 0.06em;
+        }
+
+        .week-action {
+            font-weight: 700;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--accent);
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        /* Modals */
+        .modal { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0, 35, 85, 0.6); 
+            backdrop-filter: blur(4px);
+            z-index: 1000; 
+            overflow-y: auto; 
+            padding: 2rem 1rem;
+        }
+
+        .modal-content { 
+            width: 100%; 
+            max-width: 1400px;
+            margin: 0 auto; 
+            border: 1px solid var(--border); 
+            border-top: 5px solid var(--accent);
+            border-radius: var(--radius-lg);
+            background: var(--surface); 
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            animation: modalFade 0.2s ease-out;
+        }
+
+        @keyframes modalFade {
+            from { transform: scale(0.98); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 1.25rem 2rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        /* Agenda Columns */
+        .agenda-grid { 
+            display: grid; 
+            grid-template-columns: repeat(5, 1fr); 
+            background: var(--bg-main); 
+            gap: 1px; 
+            padding: 1px;
+            min-height: 650px;
+        }
+
+        .day-col { 
+            background: var(--surface); 
+            padding: 1.25rem 1rem; 
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .day-head { 
+            background: #eef5fc; 
+            color: var(--primary); 
+            padding: 10px; 
+            text-align: center; 
+            font-weight: 800; 
+            font-size: 0.875rem; 
+            border-radius: var(--radius-md);
+            letter-spacing: 0.05em;
+            border: 1px solid var(--accent-light);
+        }
+
+        /* Project Cards */
+        .project-stub { 
+            border: 1px solid var(--border); 
+            border-radius: var(--radius-md);
+            padding: 1.1rem; 
+            cursor: pointer; 
+            background: var(--surface); 
+            position: relative; 
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .project-stub:hover { 
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--accent);
+        }
+
+        .project-stub.is-choice { 
+            border-left: 4px solid var(--mondriaan-yellow);
+            background: #fffdf2;
+        }
+
+        .project-stub.is-concept {
+            border-left: 4px dashed var(--badge-concept);
+            background: #fffaf0;
+        }
+
+        .badge-bar {
+            display: flex;
+            gap: 4px;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .choice-tag { 
+            background: var(--badge-choice-bg); 
+            color: var(--badge-choice); 
+            padding: 2px 7px; 
+            font-size: 0.625rem; 
+            border-radius: 20px; 
+            font-weight: 800; 
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .status-tag {
+            padding: 2px 7px; 
+            font-size: 0.625rem; 
+            border-radius: 20px; 
+            font-weight: 800; 
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .status-tag.concept {
+            background: var(--badge-concept-bg);
+            color: var(--badge-concept);
+        }
+
+        .status-tag.definitief {
+            background: var(--badge-definitief-bg);
+            color: var(--badge-definitief);
+        }
+
+        .project-stub-title {
+            font-size: 0.975rem;
+            font-weight: 700;
+            color: var(--text-main);
+            line-height: 1.3;
+            padding-right: 60px;
+        }
+
+        .project-stub-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: 4px;
+        }
+
+        .admin-actions { 
+            display: flex; 
+            flex-wrap: wrap;
+            gap: 6px; 
+            margin-top: 8px; 
+            padding-top: 8px;
+            border-top: 1px dashed var(--border);
+        }
+
+        .small-btn { 
+            padding: 4px 8px; 
+            font-size: 0.725rem; 
+            border: 1px solid var(--border); 
+            border-radius: 6px;
+            cursor: pointer; 
+            font-weight: 700; 
+            flex: 1; 
+            background: #f8fafc;
+            color: var(--text-main);
+            transition: background 0.15s;
+        }
+
+        .small-btn:hover { background: #e2e8f0; }
+
+        /* Detail Modal */
+        #detail-body { 
+            padding: 2.5rem; 
+            max-width: 850px; 
+            margin: auto; 
+        }
+
+        .detail-meta-box {
+            background: #eef5fc; 
+            border: 1px solid var(--accent-light); 
+            border-radius: var(--radius-md);
+            padding: 1.25rem 1.5rem; 
+            margin: 1.5rem 0; 
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+        }
+
+        .detail-meta-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .detail-meta-label {
+            font-size: 0.725rem;
+            text-transform: uppercase;
+            color: var(--accent);
+            font-weight: 800;
+            letter-spacing: 0.05em;
+        }
+
+        .detail-meta-value {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .detail-description {
+            white-space: pre-line; 
+            font-size: 1.05rem; 
+            line-height: 1.7; 
+            color: #334155;
+            margin: 1.5rem 0;
+        }
+
+        .media-box img, .media-box iframe { 
+            width: 100%; 
+            border-radius: var(--radius-md);
+            margin-top: 1.5rem; 
+            box-shadow: var(--shadow-md); 
+            border: 1px solid var(--border);
+        }
+
+        /* Admin Trigger Link */
+        .admin-trigger { 
+            position: fixed; 
+            bottom: 18px; 
+            right: 18px; 
+            font-size: 0.775rem; 
+            color: var(--text-muted); 
+            cursor: pointer; 
+            text-decoration: none; 
+            font-weight: 700;
+            background: var(--surface);
+            padding: 7px 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.2s;
+        }
+
+        .admin-trigger:hover {
+            color: var(--primary);
+            border-color: var(--accent);
+            box-shadow: var(--shadow-md);
+        }
+
+        @media (max-width: 1000px) { 
+            .agenda-grid { grid-template-columns: 1fr; } 
+            header { flex-direction: column; align-items: flex-start; }
+            .filter-box { width: 100%; justify-content: space-between; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-brand">
+        <div id="logo-container"></div>
+        <div class="header-titles">
+            <h1>Mondriaan Lifestyle, Sport en bewegen</h1>
+            <span>Projectplanner</span>
+        </div>
+    </div>
+    <div class="filter-box">
+        <span>KLAS:</span> 
+        <select id="student-filter" onchange="window.renderWeeks()">
+            <option value="ALL">-- ALLE KLASSEN --</option>
+        </select>
+    </div>
+</header>
+
+<div class="container">
+    <!-- Admin Panel -->
+    <div id="admin-panel">
+        <div class="admin-header">
+            <h2>Beheerders Dashboard</h2>
+            <button class="btn btn-secondary" onclick="window.toggleAdmin()">Sluiten ✕</button>
+        </div>
+        <div class="admin-grid">
+            <div>
+                <h3 style="margin-top:0; font-weight:800; font-size:1.05rem; color:var(--primary); margin-bottom:1rem; padding-bottom:6px; border-bottom:1px solid var(--border);">1. Algemene Instellingen</h3>
+                <div class="form-group">
+                    <label for="cfg-weeks">Aantal Weken</label>
+                    <input type="number" id="cfg-weeks" value="4">
+                </div>
+                <div class="form-group">
+                    <label for="cfg-classes">Klassen (komma gescheiden)</label>
+                    <input type="text" id="cfg-classes" value="MD1A, MD1B, SPORT1">
+                </div>
+                <div class="form-group">
+                    <label for="cfg-logo">Aangepaste Logo URL (laat leeg voor standaard logo)</label>
+                    <input type="text" id="cfg-logo" placeholder="https://..." onchange="window.updateLogo(this.value)">
+                </div>
+                <div class="form-group">
+                    <label for="cfg-password">Beheerders Wachtwoord</label>
+                    <input type="text" id="cfg-password" placeholder="Wachtwoord voor beheer">
+                </div>
+                <button class="btn btn-primary" onclick="window.saveGlobal()" style="width:100%; margin-top:0.5rem;">Config Opslaan</button>
+                
+                <div id="week-date-inputs" style="margin-top:1.5rem"></div>
+
+                <!-- Concepten Publiceren Box -->
+                <div class="publish-all-box">
+                    <h4>🚀 Concepten Publiceren</h4>
+                    <p style="font-size:0.8rem; color:#9a3412; margin-bottom:0.75rem;">
+                        Maak alle klaargezette concept-projecten in één keer definitief zichtbaar voor studenten.
+                    </p>
+                    <button class="btn btn-warning" onclick="window.publishAllConcepts()" style="width:100%;">
+                        🚀 Alle Concepten Definitief Maken
+                    </button>
+                </div>
+
+                <!-- Excel Import Box -->
+                <div class="excel-import-box">
+                    <h4>📊 Excel Projecten Importeren</h4>
+                    <p style="font-size:0.8rem; color:#166534; margin-bottom:0.75rem;">
+                        Selecteer een `.xlsx` bestand. Geïmporteerde projecten komen automatisch als <strong>Concept</strong> binnen.
+                    </p>
+                    <div class="form-group" style="margin-bottom:0.5rem;">
+                        <input type="file" id="excel-file-input" accept=".xlsx, .xls">
+                    </div>
+                    <button class="btn btn-success" onclick="window.importExcel()" style="width:100%;">
+                        📤 Importeren naar Firestore
+                    </button>
+                </div>
+            </div>
+            
+            <div style="border-left: 1px solid var(--border); padding-left: 2rem;">
+                <h3 id="form-mode-text" style="margin-top:0; font-weight:800; font-size:1.05rem; color:var(--primary); margin-bottom:1rem; padding-bottom:6px; border-bottom:1px solid var(--border);">Nieuw Project</h3>
+                <input type="hidden" id="edit-id">
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                        <label>Week</label>
+                        <select id="p-week"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Dag</label>
+                        <select id="p-dag">
+                            <option value="0">Maandag</option>
+                            <option value="1">Dinsdag</option>
+                            <option value="2">Woensdag</option>
+                            <option value="3">Donderdag</option>
+                            <option value="4">Vrijdag</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Activiteit Naam</label>
+                    <input type="text" id="p-naam" placeholder="Bijv. Zaalvoetbal Toernooi">
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                        <label>Tijd</label>
+                        <input type="text" id="p-tijd" placeholder="09:00 - 12:30">
+                    </div>
+                    <div class="form-group">
+                        <label>Locatie</label>
+                        <input type="text" id="p-loc" placeholder="Sportzaal A">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Koppel aan klassen:</label>
+                    <div id="class-checks" style="display:flex; flex-wrap:wrap; gap:10px; border:1px solid var(--border-dark); border-radius:6px; padding:10px; background:var(--surface);"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Omschrijving</label>
+                    <textarea id="p-info" rows="3" placeholder="Inhoud van de activiteit..."></textarea>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                        <label>Foto URL</label>
+                        <input type="text" id="p-img" placeholder="https://...">
+                    </div>
+                    <div class="form-group">
+                        <label>YouTube Link</label>
+                        <input type="text" id="p-vid" placeholder="YouTube URL">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Inschrijf Link</label>
+                    <input type="text" id="p-link" placeholder="https://...">
+                </div>
+
+                <!-- Opties: Keuze & Status -->
+                <div style="display:flex; gap:20px; margin: 1rem 0;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; color:var(--text-main); font-weight:600;">
+                        <input type="checkbox" id="p-choice" style="width:auto; margin:0;"> 
+                        <span>Dit is een keuzeproject</span>
+                    </label>
+
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; color:var(--badge-concept); font-weight:700;">
+                        <input type="checkbox" id="p-concept" style="width:auto; margin:0;"> 
+                        <span>Opslaan als Concept</span>
+                    </label>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-accent" id="save-btn" onclick="window.saveProject()" style="flex:2;">Project Opslaan</button>
+                    <button class="btn btn-secondary" id="cancel-edit" onclick="window.resetForm()" style="display:none; flex:1;">Annuleren</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actieve Klas Melding Banner -->
+    <div id="class-active-banner-container"></div>
+
+    <div class="section-header">
+        <div class="section-title" id="section-header-title">
+            <span>🗓️</span> Projectweken Overzicht
+        </div>
+    </div>
+    <div id="week-grid"></div>
+</div>
+
+<!-- Agenda / Week Modal -->
+<div id="agenda-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-week-title">WEEK OVERZICHT</h2>
+            <button class="btn btn-secondary" onclick="window.closeModal('agenda-modal')">✕ Sluiten</button>
+        </div>
+        <div class="agenda-grid">
+            <div class="day-col"><div class="day-head">MAANDAG</div><div id="day-0"></div></div>
+            <div class="day-col"><div class="day-head">DINSDAG</div><div id="day-1"></div></div>
+            <div class="day-col"><div class="day-head">WOENSDAG</div><div id="day-2"></div></div>
+            <div class="day-col"><div class="day-head">DONDERDAG</div><div id="day-3"></div></div>
+            <div class="day-col"><div class="day-head">VRIJDAG</div><div id="day-4"></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div id="detail-modal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <div id="detail-body"></div>
+        <div style="padding: 1.25rem 2.5rem; text-align: right; border-top: 1px solid var(--border); background: var(--bg-main);">
+            <button class="btn btn-secondary" onclick="window.closeModal('detail-modal')">Sluiten</button>
+        </div>
+    </div>
+</div>
+
+<a class="admin-trigger" onclick="window.login()">⚙️ Beheer</a>
+
+<!-- Firebase SDK Integratie -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-analytics.js";
+    import { 
+        getFirestore, 
+        doc, 
+        setDoc, 
+        collection, 
+        onSnapshot, 
+        addDoc, 
+        updateDoc, 
+        deleteDoc,
+        writeBatch
+    } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBHhmtq1uyqyFtElt4Q3xxocQmQn7xrZfs",
+        authDomain: "projectweeklsb.firebaseapp.com",
+        projectId: "projectweeklsb",
+        storageBucket: "projectweeklsb.firebasestorage.app",
+        messagingSenderId: "867110798873",
+        appId: "1:867110798873:web:ec362761e662a27fca8c88",
+        measurementId: "G-016J33NSE4"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const dbFS = getFirestore(app);
+
+    // Officieel SVG Weblogo van ROC Mondriaan
+    const MONDRIAAN_SVG_LOGO = "https://www.rocmondriaan.nl/themes/custom/rocmondriaan/logo.svg";
+
+    // Globale applicatiestaat
+    let db = {
+        weeks: 4,
+        classes: ['MD1A', 'MD1B', 'SPORT1'],
+        weekDates: {},
+        projects: [],
+        logo: '',
+        password: '4321'
+    };
+
+    let isAdmin = false;
+    let activeWeekModal = null;
+
+    // Synchroniseer Algemene Instellingen realtime vanuit Firestore
+    onSnapshot(doc(dbFS, "settings", "global"), (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            db.weeks = data.weeks || 4;
+            db.classes = data.classes || ['MD1A', 'MD1B', 'SPORT1'];
+            db.weekDates = data.weekDates || {};
+            db.logo = data.logo || '';
+            db.password = data.password || '4321';
+        } else {
+            setDoc(doc(dbFS, "settings", "global"), {
+                weeks: db.weeks,
+                classes: db.classes,
+                weekDates: db.weekDates,
+                logo: db.logo,
+                password: db.password
+            });
+        }
+        initUI();
+    });
+
+    // Synchroniseer Projecten realtime vanuit Firestore
+    onSnapshot(collection(dbFS, "projects"), (querySnapshot) => {
+        const projectsArr = [];
+        querySnapshot.forEach((doc) => {
+            projectsArr.push({ id: doc.id, ...doc.data() });
+        });
+        db.projects = projectsArr;
+        
+        renderWeeks();
+        if (activeWeekModal !== null && document.getElementById('agenda-modal').style.display === 'block') {
+            openAgenda(activeWeekModal);
+        }
+    });
+
+    function initUI() {
+        renderWeeks();
+        updateAdminUI();
+        const logoSrc = (db.logo && db.logo.trim() !== '') ? db.logo : MONDRIAAN_SVG_LOGO;
+        document.getElementById('logo-container').innerHTML = `
+            <img id="main-logo" src="${logoSrc}" alt="ROC Mondriaan Logo" onerror="this.onerror=null; this.src='${MONDRIAAN_SVG_LOGO}';">
+        `;
+    }
+
+    function updateAdminUI() {
+        const pWeek = document.getElementById('p-week');
+        pWeek.innerHTML = '';
+        for (let i = 1; i <= db.weeks; i++) {
+            pWeek.innerHTML += `<option value="${i}">Week ${i}</option>`;
+        }
+
+        const filter = document.getElementById('student-filter');
+        const checkArea = document.getElementById('class-checks');
+        const currentFilter = filter.value;
+        filter.innerHTML = '<option value="ALL">-- ALLE KLASSEN --</option>';
+        checkArea.innerHTML = '';
+
+        db.classes.forEach(c => {
+            const cls = c.trim();
+            filter.innerHTML += `<option value="${cls}">${cls}</option>`;
+            checkArea.innerHTML += `<label style="text-transform:none; font-weight:600; cursor:pointer;"><input type="checkbox" name="p-classes" value="${cls}" style="width:auto; margin-right:4px;"> ${cls}</label>`;
+        });
+        filter.value = currentFilter;
+
+        const dateInputs = document.getElementById('week-date-inputs');
+        dateInputs.innerHTML = '<h4 style="margin:15px 0 10px 0; font-weight:700; color:var(--primary); font-size:0.9rem;">Datums per Week:</h4>';
+        for (let i = 1; i <= db.weeks; i++) {
+            dateInputs.innerHTML += `
+                <div class="form-group" style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-weight:700; min-width:30px; font-size:0.85rem;">W${i}:</span> 
+                    <input type="text" id="date-w-${i}" value="${db.weekDates[i] || ''}" placeholder="bijv. 12 - 16 Okt" onchange="window.saveWeekDate(${i}, this.value)">
+                </div>`;
+        }
+        document.getElementById('cfg-weeks').value = db.weeks;
+        document.getElementById('cfg-classes').value = db.classes.join(', ');
+        document.getElementById('cfg-logo').value = db.logo || '';
+        document.getElementById('cfg-password').value = db.password || '4321';
+    }
+
+    function renderWeeks() {
+        const grid = document.getElementById('week-grid');
+        const filterVal = document.getElementById('student-filter').value;
+        const bannerContainer = document.getElementById('class-active-banner-container');
+        const sectionTitle = document.getElementById('section-header-title');
+
+        if (filterVal !== 'ALL') {
+            sectionTitle.innerHTML = `<span>🗓️</span> Projectweken voor klas <strong>${filterVal}</strong>`;
+            bannerContainer.innerHTML = `
+                <div class="class-active-banner">
+                    <span>ℹ️ Je bekijkt nu het rooster en de projectweken speciaal voor klas <strong>${filterVal}</strong>.</span>
+                    <span class="class-badge-pill">KLAS: ${filterVal}</span>
+                </div>`;
+        } else {
+            sectionTitle.innerHTML = `<span>🗓️</span> Projectweken Overzicht`;
+            bannerContainer.innerHTML = '';
+        }
+
+        grid.innerHTML = '';
+        for (let i = 1; i <= db.weeks; i++) {
+            grid.innerHTML += `
+                <div class="week-card" onclick="window.openAgenda(${i})">
+                    <div>
+                        <span class="week-date">${db.weekDates[i] || 'Datum N.t.b.'}</span>
+                        <h2>WEEK ${i}</h2>
+                    </div>
+                    <div class="week-action">
+                        <span>${filterVal !== 'ALL' ? 'Bekijk Planning voor ' + filterVal : 'Bekijk Planning'}</span>
+                        <span>→</span>
+                    </div>
+                </div>`;
+        }
+    }
+
+    async function saveGlobal() {
+        const newWeeks = parseInt(document.getElementById('cfg-weeks').value) || 4;
+        const newClasses = document.getElementById('cfg-classes').value.split(',').map(s => s.trim()).filter(Boolean);
+        const newLogo = document.getElementById('cfg-logo').value.trim();
+        const newPassword = document.getElementById('cfg-password').value || '4321';
+
+        try {
+            await setDoc(doc(dbFS, "settings", "global"), {
+                weeks: newWeeks,
+                classes: newClasses,
+                weekDates: db.weekDates,
+                logo: newLogo,
+                password: newPassword
+            }, { merge: true });
+            alert("Instellingen opgeslagen in Firestore!");
+        } catch (e) {
+            alert("Fout bij opslaan: " + e.message);
+        }
+    }
+
+    async function saveWeekDate(weekNum, val) {
+        db.weekDates[weekNum] = val;
+        await setDoc(doc(dbFS, "settings", "global"), {
+            weekDates: db.weekDates
+        }, { merge: true });
+    }
+
+    async function updateLogo(val) {
+        db.logo = val.trim();
+        await setDoc(doc(dbFS, "settings", "global"), {
+            logo: db.logo
+        }, { merge: true });
+    }
+
+    function login() {
+        const pass = prompt("Wachtwoord?");
+        if (pass === db.password) {
+            isAdmin = true;
+            document.getElementById('admin-panel').style.display = 'block';
+            updateAdminUI();
+            renderWeeks();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (pass !== null) {
+            alert("Onjuist wachtwoord.");
+        }
+    }
+
+    async function saveProject() {
+        const id = document.getElementById('edit-id').value;
+        const classes = Array.from(document.querySelectorAll('input[name="p-classes"]:checked')).map(cb => cb.value);
+
+        const projectData = {
+            week: parseInt(document.getElementById('p-week').value),
+            dag: parseInt(document.getElementById('p-dag').value),
+            naam: document.getElementById('p-naam').value,
+            tijd: document.getElementById('p-tijd').value,
+            loc: document.getElementById('p-loc').value,
+            info: document.getElementById('p-info').value,
+            img: document.getElementById('p-img').value,
+            vid: document.getElementById('p-vid').value,
+            link: document.getElementById('p-link').value,
+            choice: document.getElementById('p-choice').checked,
+            isConcept: document.getElementById('p-concept').checked,
+            classes: classes
+        };
+
+        try {
+            if (id) {
+                await updateDoc(doc(dbFS, "projects", id), projectData);
+            } else {
+                await addDoc(collection(dbFS, "projects"), projectData);
+            }
+            resetForm();
+        } catch (e) {
+            alert("Fout bij opslaan van project: " + e.message);
+        }
+    }
+
+    function editProject(id, e) {
+        e.stopPropagation();
+        
+        const p = db.projects.find(proj => proj.id == id);
+        if (!p) return;
+
+        closeModal('agenda-modal');
+
+        document.getElementById('edit-id').value = p.id;
+        document.getElementById('p-week').value = p.week;
+        document.getElementById('p-dag').value = p.dag;
+        document.getElementById('p-naam').value = p.naam;
+        document.getElementById('p-tijd').value = p.tijd || '';
+        document.getElementById('p-loc').value = p.loc || '';
+        document.getElementById('p-info').value = p.info || '';
+        document.getElementById('p-img').value = p.img || '';
+        document.getElementById('p-vid').value = p.vid || '';
+        document.getElementById('p-link').value = p.link || '';
+        document.getElementById('p-choice').checked = !!p.choice;
+        document.getElementById('p-concept').checked = !!p.isConcept;
+        
+        document.querySelectorAll('input[name="p-classes"]').forEach(cb => {
+            cb.checked = (p.classes || []).includes(cb.value);
+        });
+        
+        document.getElementById('form-mode-text').innerText = "Project Bewerken";
+        document.getElementById('save-btn').innerText = "Wijzigingen Opslaan";
+        document.getElementById('cancel-edit').style.display = 'inline-block';
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function togglePublishProject(id, e) {
+        if (e) e.stopPropagation();
+        const p = db.projects.find(proj => proj.id == id);
+        if (!p) return;
+
+        const newStatus = !p.isConcept;
+        try {
+            await updateDoc(doc(dbFS, "projects", id), { isConcept: newStatus });
+        } catch (err) {
+            alert("Fout bij wijzigen van status: " + err.message);
+        }
+    }
+
+    async function publishAllConcepts() {
+        const concepts = db.projects.filter(p => p.isConcept);
+        if (concepts.length === 0) {
+            alert("Er zijn momenteel geen concepten om te publiceren.");
+            return;
+        }
+
+        if (confirm(`Weet je zeker dat je alle ${concepts.length} concept-projecten definitief wilt maken?`)) {
+            try {
+                const batch = writeBatch(dbFS);
+                concepts.forEach(p => {
+                    const docRef = doc(dbFS, "projects", p.id);
+                    batch.update(docRef, { isConcept: false });
+                });
+                await batch.commit();
+                alert(`Succesvol ${concepts.length} concepten definitief gepubliceerd!`);
+            } catch (err) {
+                alert("Fout bij publiceren van concepten: " + err.message);
+            }
+        }
+    }
+
+    async function deleteProject(id, e) {
+        e.stopPropagation();
+        if (confirm("Verwijderen?")) {
+            try {
+                await deleteDoc(doc(dbFS, "projects", id));
+            } catch (err) {
+                alert("Fout bij verwijderen: " + err.message);
+            }
+        }
+    }
+
+    function resetForm() {
+        document.getElementById('edit-id').value = '';
+        document.getElementById('p-naam').value = '';
+        document.getElementById('p-tijd').value = '';
+        document.getElementById('p-loc').value = '';
+        document.getElementById('p-info').value = '';
+        document.getElementById('p-img').value = '';
+        document.getElementById('p-vid').value = '';
+        document.getElementById('p-link').value = '';
+        document.getElementById('p-choice').checked = false;
+        document.getElementById('p-concept').checked = false;
+        document.getElementById('form-mode-text').innerText = "Nieuw Project";
+        document.getElementById('save-btn').innerText = "Project Publiceren";
+        document.getElementById('cancel-edit').style.display = 'none';
+        document.querySelectorAll('input[name="p-classes"]').forEach(cb => cb.checked = false);
+    }
+
+    // EXCEL IMPORT MET CONCEPT STATUS
+    async function importExcel() {
+        const fileInput = document.getElementById('excel-file-input');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            alert("Selecteer eerst een Excel-bestand.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+                if (rows.length === 0) {
+                    alert("Het Excel-bestand is leeg.");
+                    return;
+                }
+
+                const validClasses = db.classes.map(c => c.trim().toUpperCase());
+                const projectsToUpload = [];
+                const dagMap = {
+                    'MAANDAG': 0, 'DINSDAG': 1, 'WOENSDAG': 2, 'DONDERDAG': 3, 'VRIJDAG': 4,
+                    'MA': 0, 'DI': 1, 'WO': 2, 'DO': 3, 'VR': 4,
+                    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4
+                };
+
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    const rowNum = i + 2;
+
+                    const getKey = (name) => Object.keys(row).find(k => k.trim().toLowerCase() === name.toLowerCase());
+                    
+                    const naam = row[getKey('naam') || getKey('activiteit') || getKey('project')];
+                    const weekVal = row[getKey('week')];
+                    let dagRaw = row[getKey('dag')];
+                    const klassenRaw = row[getKey('klassen') || getKey('klas')];
+
+                    let week = NaN;
+                    if (weekVal !== undefined && weekVal !== null) {
+                        const match = String(weekVal).match(/\d+/);
+                        if (match) week = parseInt(match[0]);
+                    }
+
+                    if (!naam || isNaN(week) || dagRaw === undefined || !klassenRaw) {
+                        let missing = [];
+                        if (!naam) missing.push("Naam");
+                        if (isNaN(week)) missing.push("Week (" + weekVal + ")");
+                        if (dagRaw === undefined) missing.push("Dag");
+                        if (!klassenRaw) missing.push("Klassen");
+                        alert(`AFGEWEZEN: Regel ${rowNum} mist verplichte velden of bevat een onleesbare waarde: ${missing.join(', ')}.`);
+                        return;
+                    }
+
+                    let dag = 0;
+                    if (typeof dagRaw === 'string') {
+                        dag = dagMap[dagRaw.trim().toUpperCase()] ?? 0;
+                    } else if (typeof dagRaw === 'number') {
+                        dag = dagRaw;
+                    }
+
+                    const rowClasses = String(klassenRaw).split(',').map(c => c.trim()).filter(Boolean);
+                    const invalidClasses = rowClasses.filter(c => !validClasses.includes(c.toUpperCase()));
+
+                    if (invalidClasses.length > 0) {
+                        alert(`IMPORT GEWEIGERD!\n\nRegel ${rowNum} ("${naam}") bevat klas(sen) die niet in het systeem staan: "${invalidClasses.join(', ')}".\n\nVoeg deze klassen eerst toe bij '1. Algemene Instellingen' in het beheerdersdashboard en sla op.`);
+                        return;
+                    }
+
+                    const choiceVal = String(row[getKey('keuze') || getKey('is-choice') || '']).toLowerCase();
+                    const isChoice = choiceVal === 'ja' || choiceVal === 'true' || choiceVal === '1';
+
+                    const statusVal = String(row[getKey('concept') || getKey('status') || '']).toLowerCase();
+                    let isConcept = true;
+                    if (statusVal === 'definitief' || statusVal === 'nee' || statusVal === 'false') {
+                        isConcept = false;
+                    }
+
+                    projectsToUpload.push({
+                        naam: String(naam),
+                        week: week,
+                        dag: dag,
+                        classes: rowClasses,
+                        tijd: String(row[getKey('tijd')] || ''),
+                        loc: String(row[getKey('locatie') || getKey('loc')] || ''),
+                        info: String(row[getKey('info') || getKey('omschrijving') || getKey('extra informatie')] || ''),
+                        choice: isChoice,
+                        isConcept: isConcept,
+                        img: String(row[getKey('foto') || getKey('img')] || ''),
+                        vid: String(row[getKey('video') || getKey('vid')] || ''),
+                        link: String(row[getKey('link')] || '')
+                    });
+                }
+
+                const batch = writeBatch(dbFS);
+                projectsToUpload.forEach(p => {
+                    const docRef = doc(collection(dbFS, "projects"));
+                    batch.set(docRef, p);
+                });
+
+                await batch.commit();
+                alert(`Succesvol ${projectsToUpload.length} projecten als Concept geïmporteerd naar Firestore!`);
+                fileInput.value = '';
+
+            } catch (err) {
+                alert("Fout bij het verwerken van het Excel-bestand: " + err.message);
+            }
+        };
+
+        reader.readAsArrayBuffer(file);
+    }
+
+    function openAgenda(w) {
+        activeWeekModal = w;
+        document.getElementById('agenda-modal').style.display = 'block';
+        const filter = document.getElementById('student-filter').value;
+        
+        document.getElementById('modal-week-title').innerText = filter !== 'ALL' 
+            ? `WEEK ${w} PLANNING - KLAS ${filter}`
+            : `WEEK ${w} PLANNING`;
+
+        for (let i = 0; i < 5; i++) {
+            const col = document.getElementById('day-' + i);
+            col.innerHTML = '';
+            db.projects.filter(p => p.week == w && p.dag == i).forEach(p => {
+                if (!isAdmin && p.isConcept) return;
+                if (filter !== 'ALL' && p.classes && !p.classes.includes(filter)) return;
+
+                const div = document.createElement('div');
+                div.className = `project-stub ${p.choice ? 'is-choice' : ''} ${p.isConcept ? 'is-concept' : ''}`;
+                div.onclick = () => showDetail(p);
+                div.innerHTML = `
+                    <div class="badge-bar">
+                        ${p.choice ? '<div class="choice-tag">Keuze</div>' : ''}
+                        ${isAdmin ? `
+                            <div class="status-tag ${p.isConcept ? 'concept' : 'definitief'}">
+                                ${p.isConcept ? '🟠 Concept' : '🟢 Definitief'}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="project-stub-title">${p.naam}</div>
+                    <div class="project-stub-meta">
+                        <span>🕒 ${p.tijd || 'TBA'}</span>
+                        <span>📍 ${p.loc || 'TBA'}</span>
+                    </div>
+                    ${isAdmin ? `
+                        <div class="admin-actions">
+                            <button class="small-btn" onclick="window.editProject('${p.id}', event)">✎ Bewerken</button>
+                            <button class="small-btn" style="color:${p.isConcept ? 'var(--badge-definitief)' : 'var(--badge-concept)'}" onclick="window.togglePublishProject('${p.id}', event)">
+                                ${p.isConcept ? '🚀 Publiceren' : '↩ Concept'}
+                            </button>
+                            <button class="small-btn" style="color:var(--danger)" onclick="window.deleteProject('${p.id}', event)">× Verwijder</button>
+                        </div>
+                    ` : ''}
+                `;
+                col.appendChild(div);
+            });
+        }
+    }
+
+    function showDetail(p) {
+        document.getElementById('detail-modal').style.display = 'block';
+        document.getElementById('detail-body').innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <h1 style="font-size:2rem; font-weight:800; color:var(--primary); margin:0 0 1rem 0; line-height:1.2;">${p.naam}</h1>
+                ${isAdmin && p.isConcept ? '<span class="status-tag concept" style="font-size:0.8rem; padding:4px 10px;">🟠 Concept (niet live voor studenten)</span>' : ''}
+            </div>
+            
+            <div class="detail-meta-box">
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Tijd</span>
+                    <span class="detail-meta-value">${p.tijd || 'Niet opgegeven'}</span>
+                </div>
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Locatie</span>
+                    <span class="detail-meta-value">${p.loc || 'Niet opgegeven'}</span>
+                </div>
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Klassen</span>
+                    <span class="detail-meta-value">${p.classes && p.classes.length ? p.classes.join(', ') : 'Alle klassen'}</span>
+                </div>
+            </div>
+
+            <div class="detail-description">${p.info || 'Geen aanvullende informatie beschikbaar.'}</div>
+
+            <div class="media-box">
+                ${p.img ? `<img src="${p.img}" alt="Project afbeelding">` : ''}
+                ${p.vid ? `<iframe height="400" src="${p.vid.replace('watch?v=', 'embed/')}" frameborder="0" allowfullscreen></iframe>` : ''}
+            </div>
+
+            ${p.link ? `<br><a href="${p.link}" target="_blank" class="btn btn-accent" style="display:block; text-align:center; font-size:1.1rem; margin-top:1.5rem; text-decoration:none;">Direct Inschrijven →</a>` : ''}
+        `;
+    }
+
+    function toggleAdmin() {
+        document.getElementById('admin-panel').style.display = isAdmin ? 'none' : 'block';
+        isAdmin = !isAdmin;
+        renderWeeks();
+    }
+
+    function closeModal(id) { 
+        document.getElementById(id).style.display = 'none'; 
+        if(id === 'agenda-modal') activeWeekModal = null;
+    }
+
+    // Expose functies naar global window scope
+    window.renderWeeks = renderWeeks;
+    window.saveGlobal = saveGlobal;
+    window.saveWeekDate = saveWeekDate;
+    window.updateLogo = updateLogo;
+    window.login = login;
+    window.saveProject = saveProject;
+    window.editProject = editProject;
+    window.togglePublishProject = togglePublishProject;
+    window.publishAllConcepts = publishAllConcepts;
+    window.deleteProject = deleteProject;
+    window.resetForm = resetForm;
+    window.openAgenda = openAgenda;
+    window.toggleAdmin = toggleAdmin;
+    window.closeModal = closeModal;
+    window.importExcel = importExcel;
+</script>
+
+</body>
+</html>
