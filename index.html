@@ -244,6 +244,8 @@
         .btn-success:hover { background: #059669; }
         .btn-warning { background: var(--badge-concept); color: var(--surface); }
         .btn-warning:hover { background: #c2410c; }
+        .btn-danger { background: var(--danger); color: var(--surface); }
+        .btn-danger:hover { background: #b80024; }
 
         .excel-import-box {
             background: #f0fdf4;
@@ -730,15 +732,37 @@
                     </button>
                 </div>
 
-                <!-- Excel Import Box -->
+                <!-- Excel Import Box met Wis-optie per Week & GOEDKEUREN code -->
                 <div class="excel-import-box">
                     <h4>📊 Excel Projecten Importeren</h4>
                     <p style="font-size:0.8rem; color:#166534; margin-bottom:0.75rem;">
-                        Selecteer een `.xlsx` bestand. Geïmporteerde projecten komen automatisch als <strong>Concept</strong> binnen.
+                        Selecteer een `.xlsx` bestand en kies welk werkblad geïmporteerd moet worden.
                     </p>
                     <div class="form-group" style="margin-bottom:0.5rem;">
-                        <input type="file" id="excel-file-input" accept=".xlsx, .xls">
+                        <label for="excel-file-input">1. Selecteer Excel-bestand:</label>
+                        <input type="file" id="excel-file-input" accept=".xlsx, .xls" onchange="window.loadExcelSheets(this)">
                     </div>
+                    
+                    <div class="form-group" id="sheet-select-container" style="display:none; margin-bottom:0.75rem;">
+                        <label for="excel-sheet-select">2. Kies te importeren Werkblad:</label>
+                        <select id="excel-sheet-select" style="font-weight:700; color:var(--primary);"></select>
+                    </div>
+
+                    <!-- Wis Optie Selectie Dropdown -->
+                    <div class="form-group" style="margin: 0.75rem 0; padding:10px; background:#fef2f2; border:1px solid #fecaca; border-radius:6px;">
+                        <label for="wipe-mode-select" style="color:var(--mondriaan-red); font-weight:700;">
+                            ⚠️ Wis-optie vóór import:
+                        </label>
+                        <select id="wipe-mode-select" style="font-weight:600; color:var(--text-main);">
+                            <option value="NONE">Niets wissen (Bestaande projecten bijwerken/toevoegen)</option>
+                            <option value="SPECIFIC_WEEK">Wis ALLEEN de projecten van de week/weken uit het Excel-bestand</option>
+                            <option value="ALL">Wis ALLE projecten uit de GEHELE database</option>
+                        </select>
+                        <span style="font-size:0.725rem; color:#991b1b; display:block; margin-top:4px;">
+                            * Voor de wis-opties is de beveiligingscode GOEDKEUREN vereist.
+                        </span>
+                    </div>
+
                     <button class="btn btn-success" onclick="window.importExcel()" style="width:100%;">
                         📤 Importeren naar Firestore
                     </button>
@@ -919,6 +943,7 @@
 
     let isAdmin = false;
     let activeWeekModal = null;
+    let currentLoadedWorkbook = null;
 
     // Synchroniseer Algemene Instellingen realtime vanuit Firestore
     onSnapshot(doc(dbFS, "settings", "global"), (docSnap) => {
@@ -1085,10 +1110,10 @@
         const classes = Array.from(document.querySelectorAll('input[name="p-classes"]:checked')).map(cb => cb.value);
 
         const projectData = {
+            naam: document.getElementById('p-naam').value.trim(),
+            docent: document.getElementById('p-docent').value.trim(),
             week: parseInt(document.getElementById('p-week').value),
             dag: parseInt(document.getElementById('p-dag').value),
-            naam: document.getElementById('p-naam').value,
-            docent: document.getElementById('p-docent').value.trim(),
             tijd: document.getElementById('p-tijd').value,
             loc: document.getElementById('p-loc').value,
             info: document.getElementById('p-info').value,
@@ -1209,123 +1234,281 @@
         document.querySelectorAll('input[name="p-classes"]').forEach(cb => cb.checked = false);
     }
 
-    // EXCEL IMPORT MET DOCENT EN CONCEPT STATUS
-    async function importExcel() {
-        const fileInput = document.getElementById('excel-file-input');
-        const file = fileInput.files[0];
-
+    // LEES DE WERKBLADEN UIT VOOR SELECTIE DROPDOWN
+    function loadExcelSheets(input) {
+        const file = input.files[0];
         if (!file) {
-            alert("Selecteer eerst een Excel-bestand.");
+            document.getElementById('sheet-select-container').style.display = 'none';
+            currentLoadedWorkbook = null;
             return;
         }
 
         const reader = new FileReader();
-        reader.onload = async function(e) {
+        reader.onload = function(e) {
             try {
                 const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(firstSheet);
+                currentLoadedWorkbook = XLSX.read(data, { type: 'array' });
+                
+                const select = document.getElementById('excel-sheet-select');
+                select.innerHTML = '';
 
-                if (rows.length === 0) {
-                    alert("Het Excel-bestand is leeg.");
+                currentLoadedWorkbook.SheetNames.forEach((sheetName) => {
+                    const opt = document.createElement('option');
+                    opt.value = sheetName;
+                    opt.textContent = sheetName;
+                    select.appendChild(opt);
+                });
+
+                document.getElementById('sheet-select-container').style.display = 'block';
+
+                const defaultSheet = currentLoadedWorkbook.SheetNames.find(s => s.toLowerCase().includes('week 51') || s.toLowerCase().includes('overzicht week'));
+                if (defaultSheet) {
+                    select.value = defaultSheet;
+                }
+
+            } catch (err) {
+                alert("Fout bij het inlezen van de werkbladen uit Excel: " + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // IMPORTEER EXCEL (MET SPECIFIEKE WEEK WISSEN & GOEDKEUREN CODE)
+    async function importExcel() {
+        const fileInput = document.getElementById('excel-file-input');
+        const sheetSelect = document.getElementById('excel-sheet-select');
+        const wipeModeSelect = document.getElementById('wipe-mode-select');
+
+        if (!fileInput.files[0] || !currentLoadedWorkbook) {
+            alert("Selecteer eerst een Excel-bestand.");
+            return;
+        }
+
+        const selectedSheetName = sheetSelect.value;
+        if (!selectedSheetName) {
+            alert("Kies een werkblad uit de lijst om te importeren.");
+            return;
+        }
+
+        const wipeMode = wipeModeSelect.value; // 'NONE', 'SPECIFIC_WEEK', 'ALL'
+
+        // Vraag om GOEDKEUREN code als er gewist gaat worden
+        if (wipeMode !== 'NONE') {
+            const wipeDesc = wipeMode === 'ALL' 
+                ? "ALLE projecten uit de gehele database" 
+                : "alleen de projecten van de week/weken die in het Excel-bestand staan";
+                
+            const confirmCode = prompt(`⚠️ WAARSCHUWING: Dit zal ${wipeDesc} definitief verwijderen.\n\nType de code 'GOEDKEUREN' (in hoofdletters) om te bevestigen:`);
+            
+            if (confirmCode !== "GOEDKEUREN") {
+                alert("Import geannuleerd. De ingevoerde code was onjuist.");
+                return;
+            }
+        }
+
+        try {
+            const activeSheet = currentLoadedWorkbook.Sheets[selectedSheetName];
+            const rows = XLSX.utils.sheet_to_json(activeSheet);
+
+            if (!rows || rows.length === 0) {
+                alert(`Het gekozen werkblad "${selectedSheetName}" is leeg.`);
+                return;
+            }
+
+            // Verzamel eerst alle rijen en te importeren weken
+            const parsedRows = [];
+            const importedWeeksSet = new Set();
+            const noClassWarnings = [];
+            let maxWeekFound = db.weeks;
+            const newClassesFound = new Set(db.classes);
+
+            const dagMap = {
+                'MAANDAG': 0, 'MA': 0, 'MON': 0, 'MONDAY': 0, '0': 0,
+                'DINSDAG': 1, 'DI': 1, 'TUE': 1, 'TUESDAY': 1, '1': 1,
+                'WOENSDAG': 2, 'WO': 2, 'WED': 2, 'WEDNESDAY': 2, '2': 2,
+                'DONDERDAG': 3, 'DO': 3, 'THU': 3, 'THURSDAY': 3, '3': 3,
+                'VRIJDAG': 4, 'VR': 4, 'FRI': 4, 'FRIDAY': 4, '4': 4
+            };
+
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const rowNum = i + 2;
+
+                const getKey = (name) => Object.keys(row).find(k => k.trim().toLowerCase() === name.toLowerCase());
+                
+                const naamRaw = row[getKey('naam') || getKey('activiteit') || getKey('project')];
+                const weekVal = row[getKey('week')];
+                let dagRaw = row[getKey('dag')];
+
+                if (!naamRaw && weekVal === undefined && dagRaw === undefined) continue;
+
+                let week = NaN;
+                if (weekVal !== undefined && weekVal !== null) {
+                    const match = String(weekVal).match(/\d+/);
+                    if (match) week = parseInt(match[0]);
+                }
+
+                if (!naamRaw || isNaN(week) || dagRaw === undefined) {
+                    let missing = [];
+                    if (!naamRaw) missing.push("Naam");
+                    if (isNaN(week)) missing.push("Week (" + weekVal + ")");
+                    if (dagRaw === undefined) missing.push("Dag");
+                    alert(`AFGEWEZEN: Regel ${rowNum} mist verplichte velden: ${missing.join(', ')}.`);
                     return;
                 }
 
-                const validClasses = db.classes.map(c => c.trim().toUpperCase());
-                const projectsToUpload = [];
-                const dagMap = {
-                    'MAANDAG': 0, 'DINSDAG': 1, 'WOENSDAG': 2, 'DONDERDAG': 3, 'VRIJDAG': 4,
-                    'MA': 0, 'DI': 1, 'WO': 2, 'DO': 3, 'VR': 4,
-                    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4
-                };
+                const naamClean = String(naamRaw).trim();
+                importedWeeksSet.add(week);
 
-                for (let i = 0; i < rows.length; i++) {
-                    const row = rows[i];
-                    const rowNum = i + 2;
+                if (week > maxWeekFound) {
+                    maxWeekFound = week;
+                }
 
-                    const getKey = (name) => Object.keys(row).find(k => k.trim().toLowerCase() === name.toLowerCase());
-                    
-                    const naam = row[getKey('naam') || getKey('activiteit') || getKey('project')];
-                    const weekVal = row[getKey('week')];
-                    let dagRaw = row[getKey('dag')];
-                    const klassenRaw = row[getKey('klassen') || getKey('klas')];
+                let dag = 0;
+                if (typeof dagRaw === 'string') {
+                    dag = dagMap[dagRaw.trim().toUpperCase()] ?? 0;
+                } else if (typeof dagRaw === 'number') {
+                    dag = dagRaw;
+                }
 
-                    let week = NaN;
-                    if (weekVal !== undefined && weekVal !== null) {
-                        const match = String(weekVal).match(/\d+/);
-                        if (match) week = parseInt(match[0]);
-                    }
+                let rowClasses = [];
+                const klassenRaw = row[getKey('klassen') || getKey('klas')];
+                
+                if (klassenRaw) {
+                    rowClasses = String(klassenRaw).split(',').map(c => c.trim()).filter(Boolean);
+                }
 
-                    if (!naam || isNaN(week) || dagRaw === undefined || !klassenRaw) {
-                        let missing = [];
-                        if (!naam) missing.push("Naam");
-                        if (isNaN(week)) missing.push("Week (" + weekVal + ")");
-                        if (dagRaw === undefined) missing.push("Dag");
-                        if (!klassenRaw) missing.push("Klassen");
-                        alert(`AFGEWEZEN: Regel ${rowNum} mist verplichte velden of bevat een onleesbare waarde: ${missing.join(', ')}.`);
-                        return;
-                    }
-
-                    let dag = 0;
-                    if (typeof dagRaw === 'string') {
-                        dag = dagMap[dagRaw.trim().toUpperCase()] ?? 0;
-                    } else if (typeof dagRaw === 'number') {
-                        dag = dagRaw;
-                    }
-
-                    const rowClasses = String(klassenRaw).split(',').map(c => c.trim()).filter(Boolean);
-                    const invalidClasses = rowClasses.filter(c => !validClasses.includes(c.toUpperCase()));
-
-                    if (invalidClasses.length > 0) {
-                        alert(`IMPORT GEWEIGERD!\n\nRegel ${rowNum} ("${naam}") bevat klas(sen) die niet in het systeem staan: "${invalidClasses.join(', ')}".\n\nVoeg deze klassen eerst toe bij '1. Algemene Instellingen' in het beheerdersdashboard en sla op.`);
-                        return;
-                    }
-
-                    const choiceVal = String(row[getKey('keuze') || getKey('is-choice') || '']).toLowerCase();
-                    const isChoice = choiceVal === 'ja' || choiceVal === 'true' || choiceVal === '1';
-
-                    const statusVal = String(row[getKey('concept') || getKey('status') || '']).toLowerCase();
-                    let isConcept = true;
-                    if (statusVal === 'definitief' || statusVal === 'nee' || statusVal === 'false') {
-                        isConcept = false;
-                    }
-
-                    const docentVal = row[getKey('verantwoordelijke docent') || getKey('docent') || getKey('docenten') || ''];
-
-                    projectsToUpload.push({
-                        naam: String(naam),
-                        docent: String(docentVal || ''),
-                        week: week,
-                        dag: dag,
-                        classes: rowClasses,
-                        tijd: String(row[getKey('tijd')] || ''),
-                        loc: String(row[getKey('locatie') || getKey('loc')] || ''),
-                        info: String(row[getKey('info') || getKey('omschrijving') || getKey('extra informatie')] || ''),
-                        choice: isChoice,
-                        isConcept: isConcept,
-                        img: String(row[getKey('foto') || getKey('img')] || ''),
-                        vid: String(row[getKey('video') || getKey('vid')] || ''),
-                        link: String(row[getKey('link')] || '')
+                if (rowClasses.length === 0) {
+                    Object.keys(row).forEach(k => {
+                        if (/^klas\s*\d+$/i.test(k.trim()) && row[k]) {
+                            const val = String(row[k]).trim();
+                            if (val && !rowClasses.includes(val)) {
+                                rowClasses.push(val);
+                            }
+                        }
                     });
                 }
 
-                const batch = writeBatch(dbFS);
-                projectsToUpload.forEach(p => {
-                    const docRef = doc(collection(dbFS, "projects"));
-                    batch.set(docRef, p);
+                if (rowClasses.length === 0) {
+                    noClassWarnings.push({ naam: naamClean, row: rowNum });
+                } else {
+                    rowClasses.forEach(c => newClassesFound.add(c));
+                }
+
+                const choiceVal = String(row[getKey('keuze') || getKey('is-choice') || '']).toLowerCase();
+                const isChoice = choiceVal === 'ja' || choiceVal === 'true' || choiceVal === '1';
+
+                const statusVal = String(row[getKey('concept') || getKey('status') || '']).toLowerCase();
+                let isConcept = true;
+                if (statusVal === 'definitief' || statusVal === 'nee' || statusVal === 'false') {
+                    isConcept = false;
+                }
+
+                const docentVal = row[getKey('verantwoordelijke docent') || getKey('docent') || getKey('docenten') || ''];
+                const infoVal = row[getKey('omschrijving project') || getKey('omschrijving') || getKey('info') || getKey('extra informatie') || ''];
+
+                parsedRows.push({
+                    naam: naamClean,
+                    docent: String(docentVal || '').trim(),
+                    week: week,
+                    dag: dag,
+                    classes: rowClasses,
+                    tijd: String(row[getKey('tijd')] || '').trim(),
+                    loc: String(row[getKey('locatie') || getKey('loc')] || '').trim(),
+                    info: String(infoVal || '').trim(),
+                    choice: isChoice,
+                    isConcept: isConcept,
+                    img: String(row[getKey('foto') || getKey('img')] || '').trim(),
+                    vid: String(row[getKey('video') || getKey('vid')] || '').trim(),
+                    link: String(row[getKey('link')] || '').trim()
                 });
-
-                await batch.commit();
-                alert(`Succesvol ${projectsToUpload.length} projecten als Concept geïmporteerd naar Firestore!`);
-                fileInput.value = '';
-
-            } catch (err) {
-                alert("Fout bij het verwerken van het Excel-bestand: " + err.message);
             }
-        };
 
-        reader.readAsArrayBuffer(file);
+            // WISSEN OP BASIS VAN GESELECTEERDE OPTIE
+            if (wipeMode === 'ALL') {
+                const wipeBatch = writeBatch(dbFS);
+                db.projects.forEach(p => {
+                    wipeBatch.delete(doc(dbFS, "projects", p.id));
+                });
+                await wipeBatch.commit();
+                db.projects = [];
+            } else if (wipeMode === 'SPECIFIC_WEEK') {
+                const wipeBatch = writeBatch(dbFS);
+                const toDelete = db.projects.filter(p => importedWeeksSet.has(p.week));
+                toDelete.forEach(p => {
+                    wipeBatch.delete(doc(dbFS, "projects", p.id));
+                });
+                await wipeBatch.commit();
+                db.projects = db.projects.filter(p => !importedWeeksSet.has(p.week));
+            }
+
+            // UPLOAD / UPDATE NAAR FIRESTORE
+            const batch = writeBatch(dbFS);
+            let addedCount = 0;
+            let updatedCount = 0;
+
+            for (const projectPayload of parsedRows) {
+                const existingProj = (wipeMode === 'NONE') ? db.projects.find(p => 
+                    p.naam.trim().toLowerCase() === projectPayload.naam.toLowerCase() && 
+                    p.week === projectPayload.week && 
+                    p.dag === projectPayload.dag
+                ) : null;
+
+                if (existingProj) {
+                    const docRef = doc(dbFS, "projects", existingProj.id);
+                    batch.update(docRef, projectPayload);
+                    updatedCount++;
+                } else {
+                    const docRef = doc(collection(dbFS, "projects"));
+                    batch.set(docRef, projectPayload);
+                    addedCount++;
+                }
+            }
+
+            // Synchroniseer klassen en aantal weken
+            const updatedClasses = Array.from(newClassesFound);
+            const updateSettingsObj = {};
+            if (updatedClasses.length !== db.classes.length) {
+                updateSettingsObj.classes = updatedClasses;
+                db.classes = updatedClasses;
+            }
+            if (maxWeekFound > db.weeks) {
+                updateSettingsObj.weeks = maxWeekFound;
+                db.weeks = maxWeekFound;
+            }
+            if (Object.keys(updateSettingsObj).length > 0) {
+                await setDoc(doc(dbFS, "settings", "global"), updateSettingsObj, { merge: true });
+            }
+
+            await batch.commit();
+
+            const importedWeeksArr = Array.from(importedWeeksSet).sort((a,b)=>a-b);
+            let msg = `✅ Import voltooid uit werkblad "${selectedSheetName}"!\n\n`;
+            if (wipeMode === 'ALL') {
+                msg += `• Gehele database vooraf leeggemaakt.\n`;
+            } else if (wipeMode === 'SPECIFIC_WEEK') {
+                msg += `• Alle bestaande projecten van Week ${importedWeeksArr.join(', ')} vooraf gewist (andere weken bleven intact).\n`;
+            }
+            msg += `• ${addedCount} nieuwe projecten toegevoegd\n`;
+            if (updatedCount > 0) msg += `• ${updatedCount} bestaande projecten bijgewerkt\n`;
+
+            if (noClassWarnings.length > 0) {
+                msg += `\n⚠️ WAARSCHUWING: Bij ${noClassWarnings.length} project(en) is geen klas opgegeven:\n`;
+                noClassWarnings.forEach(w => {
+                    msg += `• ${w.naam} (Regel ${w.row})\n`;
+                });
+            }
+            alert(msg);
+            
+            // Formulier resetten
+            fileInput.value = '';
+            wipeModeSelect.value = 'NONE';
+            document.getElementById('sheet-select-container').style.display = 'none';
+            currentLoadedWorkbook = null;
+
+        } catch (err) {
+            alert("Fout bij het verwerken van het Excel-bestand: " + err.message);
+        }
     }
 
     function openAgenda(w) {
@@ -1342,7 +1525,7 @@
             col.innerHTML = '';
             db.projects.filter(p => p.week == w && p.dag == i).forEach(p => {
                 if (!isAdmin && p.isConcept) return;
-                if (filter !== 'ALL' && p.classes && !p.classes.includes(filter)) return;
+                if (filter !== 'ALL' && p.classes && p.classes.length > 0 && !p.classes.includes(filter)) return;
 
                 const div = document.createElement('div');
                 div.className = `project-stub ${p.choice ? 'is-choice' : ''} ${p.isConcept ? 'is-concept' : ''}`;
@@ -1441,6 +1624,7 @@
     window.openAgenda = openAgenda;
     window.toggleAdmin = toggleAdmin;
     window.closeModal = closeModal;
+    window.loadExcelSheets = loadExcelSheets;
     window.importExcel = importExcel;
 </script>
 
