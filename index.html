@@ -280,6 +280,22 @@
             margin-bottom: 0.5rem;
         }
 
+        /* Status Banner bovenaan bij 2e beheerder */
+        .editor-banner {
+            background: #eef5fc;
+            border: 1px solid var(--accent-light);
+            border-left: 5px solid var(--accent);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow-sm);
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
         /* Klas Filter Melding Banner */
         .class-active-banner {
             background: #eef5fc;
@@ -692,10 +708,23 @@
 </header>
 
 <div class="container">
-    <!-- Admin Panel -->
+    <!-- Banner voor 2e Beheerder (Redacteur / Alleen Omschrijving Bewerken) -->
+    <div id="editor-panel" style="display:none;">
+        <div class="editor-banner">
+            <div>
+                <strong style="color:var(--primary); font-size:1rem;">📝 Redacteur-modus actief (2e Beheerder)</strong>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">
+                    Open een week en klik bij een project op <strong>"📝 Omschrijving aanpassen"</strong> om de projecttekst te bewerken.
+                </p>
+            </div>
+            <button class="btn btn-secondary" onclick="window.logoutEditor()">Uitloggen ✕</button>
+        </div>
+    </div>
+
+    <!-- Hoofdbeheerder Panel -->
     <div id="admin-panel">
         <div class="admin-header">
-            <h2>Beheerders Dashboard</h2>
+            <h2>Beheerders Dashboard (Hoofdbeheerder)</h2>
             <button class="btn btn-secondary" onclick="window.toggleAdmin()">Sluiten ✕</button>
         </div>
         <div class="admin-grid">
@@ -713,9 +742,15 @@
                     <label for="cfg-logo">Aangepaste Logo URL (laat leeg voor standaard logo)</label>
                     <input type="text" id="cfg-logo" placeholder="https://..." onchange="window.updateLogo(this.value)">
                 </div>
-                <div class="form-group">
-                    <label for="cfg-password">Beheerders Wachtwoord</label>
-                    <input type="text" id="cfg-password" placeholder="Wachtwoord voor beheer">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="form-group">
+                        <label for="cfg-password">Wachtwoord Hoofdbeheer</label>
+                        <input type="text" id="cfg-password" placeholder="Bijv. 4321">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-editor-password">Wachtwoord 2e Beheerder</label>
+                        <input type="text" id="cfg-editor-password" placeholder="Bijv. 1234">
+                    </div>
                 </div>
                 <button class="btn btn-primary" onclick="window.saveGlobal()" style="width:100%; margin-top:0.5rem;">Config Opslaan</button>
                 
@@ -896,6 +931,43 @@
     </div>
 </div>
 
+<!-- Modal voor 2e Beheerder (Alleen Omschrijving Bewerken) -->
+<div id="editor-desc-modal" class="modal" style="z-index: 1100;">
+    <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-header">
+            <h2 id="editor-modal-title">📝 Projectomschrijving Aanpassen</h2>
+            <button class="btn btn-secondary" onclick="window.closeModal('editor-desc-modal')">✕ Sluiten</button>
+        </div>
+        <div style="padding: 2rem;">
+            <input type="hidden" id="editor-project-id">
+            <div class="detail-meta-box" style="margin-top:0;">
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Activiteit</span>
+                    <span class="detail-meta-value" id="editor-proj-name"></span>
+                </div>
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Week / Dag</span>
+                    <span class="detail-meta-value" id="editor-proj-when"></span>
+                </div>
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Klassen</span>
+                    <span class="detail-meta-value" id="editor-proj-classes"></span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="editor-proj-info" style="color:var(--primary); font-size:0.85rem;">Omschrijving van het evenement:</label>
+                <textarea id="editor-proj-info" rows="8" placeholder="Voer hier de volledige omschrijving of uitleg van het project in..." style="font-size:1rem; line-height:1.6;"></textarea>
+            </div>
+            
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:1.5rem;">
+                <button class="btn btn-secondary" onclick="window.closeModal('editor-desc-modal')">Annuleren</button>
+                <button class="btn btn-accent" onclick="window.saveEditorDescription()">💾 Omschrijving Opslaan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <a class="admin-trigger" onclick="window.login()">⚙️ Beheer</a>
 
 <!-- Firebase SDK Integratie -->
@@ -929,7 +1001,7 @@
     const dbFS = getFirestore(app);
 
     // Officieel SVG Weblogo van ROC Mondriaan
-    const MONDRIAAN_SVG_LOGO = "./logo.png";
+    const MONDRIAAN_SVG_LOGO = "https://www.rocmondriaan.nl/themes/custom/rocmondriaan/logo.svg";
 
     // Globale applicatiestaat
     let db = {
@@ -938,10 +1010,12 @@
         weekDates: {},
         projects: [],
         logo: '',
-        password: '4321'
+        password: '4321',
+        editorPassword: '1234'
     };
 
-    let isAdmin = false;
+    // Beheerdersrollen: 'NONE' | 'ADMIN' (volledig beheer) | 'EDITOR' (2e beheerder: alleen omschrijving aanpassen)
+    let userRole = 'NONE';
     let activeWeekModal = null;
     let currentLoadedWorkbook = null;
 
@@ -954,13 +1028,15 @@
             db.weekDates = data.weekDates || {};
             db.logo = data.logo || '';
             db.password = data.password || '4321';
+            db.editorPassword = data.editorPassword || '1234';
         } else {
             setDoc(doc(dbFS, "settings", "global"), {
                 weeks: db.weeks,
                 classes: db.classes,
                 weekDates: db.weekDates,
                 logo: db.logo,
-                password: db.password
+                password: db.password,
+                editorPassword: db.editorPassword
             });
         }
         initUI();
@@ -1022,6 +1098,7 @@
         document.getElementById('cfg-classes').value = db.classes.join(', ');
         document.getElementById('cfg-logo').value = db.logo || '';
         document.getElementById('cfg-password').value = db.password || '4321';
+        document.getElementById('cfg-editor-password').value = db.editorPassword || '1234';
     }
 
     function renderWeeks() {
@@ -1063,6 +1140,12 @@
         const newClasses = document.getElementById('cfg-classes').value.split(',').map(s => s.trim()).filter(Boolean);
         const newLogo = document.getElementById('cfg-logo').value.trim();
         const newPassword = document.getElementById('cfg-password').value || '4321';
+        const newEditorPassword = document.getElementById('cfg-editor-password').value || '1234';
+
+        if (newPassword === newEditorPassword) {
+            alert("Waarschuwing: Het wachtwoord voor de hoofdbeheerder en de 2e beheerder moeten verschillend zijn.");
+            return;
+        }
 
         try {
             await setDoc(doc(dbFS, "settings", "global"), {
@@ -1070,7 +1153,8 @@
                 classes: newClasses,
                 weekDates: db.weekDates,
                 logo: newLogo,
-                password: newPassword
+                password: newPassword,
+                editorPassword: newEditorPassword
             }, { merge: true });
             alert("Instellingen opgeslagen in Firestore!");
         } catch (e) {
@@ -1092,20 +1176,70 @@
         }, { merge: true });
     }
 
+    // INLOGGEN VOOR HOOFDBEHEERDER EN 2E BEHEERDER
     function login() {
-        const pass = prompt("Wachtwoord?");
+        const pass = prompt("Voer het beheerders- of redacteurswachtwoord in:");
+        if (pass === null) return;
+
         if (pass === db.password) {
-            isAdmin = true;
+            userRole = 'ADMIN';
             document.getElementById('admin-panel').style.display = 'block';
+            document.getElementById('editor-panel').style.display = 'none';
             updateAdminUI();
             renderWeeks();
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (pass !== null) {
+        } else if (pass === db.editorPassword) {
+            userRole = 'EDITOR';
+            document.getElementById('admin-panel').style.display = 'none';
+            document.getElementById('editor-panel').style.display = 'block';
+            renderWeeks();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
             alert("Onjuist wachtwoord.");
         }
     }
 
+    function logoutEditor() {
+        userRole = 'NONE';
+        document.getElementById('editor-panel').style.display = 'none';
+        renderWeeks();
+    }
+
+    // FUNCTIES VOOR 2E BEHEERDER (ALLEEN OMSCHRIJVING BEWERKEN)
+    function openEditorDescriptionModal(id, e) {
+        if (e) e.stopPropagation();
+        const p = db.projects.find(proj => proj.id == id);
+        if (!p) return;
+
+        const dagenNamen = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag'];
+        document.getElementById('editor-project-id').value = p.id;
+        document.getElementById('editor-proj-name').innerText = p.naam;
+        document.getElementById('editor-proj-when').innerText = `Week ${p.week} - ${dagenNamen[p.dag] || ''}`;
+        document.getElementById('editor-proj-classes').innerText = (p.classes && p.classes.length) ? p.classes.join(', ') : 'Alle klassen';
+        document.getElementById('editor-proj-info').value = p.info || '';
+
+        document.getElementById('editor-desc-modal').style.display = 'block';
+    }
+
+    async function saveEditorDescription() {
+        const id = document.getElementById('editor-project-id').value;
+        const newInfo = document.getElementById('editor-proj-info').value;
+
+        if (!id) return;
+
+        try {
+            await updateDoc(doc(dbFS, "projects", id), {
+                info: newInfo
+            });
+            closeModal('editor-desc-modal');
+            alert("✅ De projectomschrijving is succesvol bijgewerkt!");
+        } catch (err) {
+            alert("Fout bij opslaan van de omschrijving: " + err.message);
+        }
+    }
+
     async function saveProject() {
+        if (userRole !== 'ADMIN') return;
         const id = document.getElementById('edit-id').value;
         const classes = Array.from(document.querySelectorAll('input[name="p-classes"]:checked')).map(cb => cb.value);
 
@@ -1138,6 +1272,7 @@
     }
 
     function editProject(id, e) {
+        if (userRole !== 'ADMIN') return;
         e.stopPropagation();
         
         const p = db.projects.find(proj => proj.id == id);
@@ -1171,6 +1306,7 @@
     }
 
     async function togglePublishProject(id, e) {
+        if (userRole !== 'ADMIN') return;
         if (e) e.stopPropagation();
         const p = db.projects.find(proj => proj.id == id);
         if (!p) return;
@@ -1184,6 +1320,7 @@
     }
 
     async function publishAllConcepts() {
+        if (userRole !== 'ADMIN') return;
         const concepts = db.projects.filter(p => p.isConcept);
         if (concepts.length === 0) {
             alert("Er zijn momenteel geen concepten om te publiceren.");
@@ -1206,6 +1343,7 @@
     }
 
     async function deleteProject(id, e) {
+        if (userRole !== 'ADMIN') return;
         e.stopPropagation();
         if (confirm("Verwijderen?")) {
             try {
@@ -1275,6 +1413,7 @@
 
     // IMPORTEER EXCEL (MET SPECIFIEKE WEEK WISSEN & GOEDKEUREN CODE)
     async function importExcel() {
+        if (userRole !== 'ADMIN') return;
         const fileInput = document.getElementById('excel-file-input');
         const sheetSelect = document.getElementById('excel-sheet-select');
         const wipeModeSelect = document.getElementById('wipe-mode-select');
@@ -1290,9 +1429,8 @@
             return;
         }
 
-        const wipeMode = wipeModeSelect.value; // 'NONE', 'SPECIFIC_WEEK', 'ALL'
+        const wipeMode = wipeModeSelect.value;
 
-        // Vraag om GOEDKEUREN code als er gewist gaat worden
         if (wipeMode !== 'NONE') {
             const wipeDesc = wipeMode === 'ALL' 
                 ? "ALLE projecten uit de gehele database" 
@@ -1315,7 +1453,6 @@
                 return;
             }
 
-            // Verzamel eerst alle rijen en te importeren weken
             const parsedRows = [];
             const importedWeeksSet = new Set();
             const noClassWarnings = [];
@@ -1424,7 +1561,6 @@
                 });
             }
 
-            // WISSEN OP BASIS VAN GESELECTEERDE OPTIE
             if (wipeMode === 'ALL') {
                 const wipeBatch = writeBatch(dbFS);
                 db.projects.forEach(p => {
@@ -1442,7 +1578,6 @@
                 db.projects = db.projects.filter(p => !importedWeeksSet.has(p.week));
             }
 
-            // UPLOAD / UPDATE NAAR FIRESTORE
             const batch = writeBatch(dbFS);
             let addedCount = 0;
             let updatedCount = 0;
@@ -1465,7 +1600,6 @@
                 }
             }
 
-            // Synchroniseer klassen en aantal weken
             const updatedClasses = Array.from(newClassesFound);
             const updateSettingsObj = {};
             if (updatedClasses.length !== db.classes.length) {
@@ -1500,7 +1634,6 @@
             }
             alert(msg);
             
-            // Formulier resetten
             fileInput.value = '';
             wipeModeSelect.value = 'NONE';
             document.getElementById('sheet-select-container').style.display = 'none';
@@ -1515,6 +1648,7 @@
         activeWeekModal = w;
         document.getElementById('agenda-modal').style.display = 'block';
         const filter = document.getElementById('student-filter').value;
+        const isPrivileged = (userRole === 'ADMIN' || userRole === 'EDITOR');
         
         document.getElementById('modal-week-title').innerText = filter !== 'ALL' 
             ? `WEEK ${w} PLANNING - KLAS ${filter}`
@@ -1524,8 +1658,30 @@
             const col = document.getElementById('day-' + i);
             col.innerHTML = '';
             db.projects.filter(p => p.week == w && p.dag == i).forEach(p => {
-                if (!isAdmin && p.isConcept) return;
+                // Studenten zien geen concepten; beheerders en redacteuren zien ze wel
+                if (!isPrivileged && p.isConcept) return;
                 if (filter !== 'ALL' && p.classes && p.classes.length > 0 && !p.classes.includes(filter)) return;
+
+                let actionButtonsHtml = '';
+                if (userRole === 'ADMIN') {
+                    actionButtonsHtml = `
+                        <div class="admin-actions">
+                            <button class="small-btn" onclick="window.editProject('${p.id}', event)">✎ Bewerken</button>
+                            <button class="small-btn" style="color:${p.isConcept ? 'var(--badge-definitief)' : 'var(--badge-concept)'}" onclick="window.togglePublishProject('${p.id}', event)">
+                                ${p.isConcept ? '🚀 Publiceren' : '↩ Concept'}
+                            </button>
+                            <button class="small-btn" style="color:var(--danger)" onclick="window.deleteProject('${p.id}', event)">× Verwijder</button>
+                        </div>
+                    `;
+                } else if (userRole === 'EDITOR') {
+                    actionButtonsHtml = `
+                        <div class="admin-actions">
+                            <button class="small-btn" style="color:var(--accent); background:#eef5fc; border-color:var(--accent-light);" onclick="window.openEditorDescriptionModal('${p.id}', event)">
+                                📝 Omschrijving aanpassen
+                            </button>
+                        </div>
+                    `;
+                }
 
                 const div = document.createElement('div');
                 div.className = `project-stub ${p.choice ? 'is-choice' : ''} ${p.isConcept ? 'is-concept' : ''}`;
@@ -1533,7 +1689,7 @@
                 div.innerHTML = `
                     <div class="badge-bar">
                         ${p.choice ? '<div class="choice-tag">Keuze</div>' : ''}
-                        ${isAdmin ? `
+                        ${isPrivileged ? `
                             <div class="status-tag ${p.isConcept ? 'concept' : 'definitief'}">
                                 ${p.isConcept ? '🟠 Concept' : '🟢 Definitief'}
                             </div>
@@ -1545,15 +1701,7 @@
                         <span>📍 ${p.loc || 'TBA'}</span>
                         ${p.docent ? `<span>👤 ${p.docent}</span>` : ''}
                     </div>
-                    ${isAdmin ? `
-                        <div class="admin-actions">
-                            <button class="small-btn" onclick="window.editProject('${p.id}', event)">✎ Bewerken</button>
-                            <button class="small-btn" style="color:${p.isConcept ? 'var(--badge-definitief)' : 'var(--badge-concept)'}" onclick="window.togglePublishProject('${p.id}', event)">
-                                ${p.isConcept ? '🚀 Publiceren' : '↩ Concept'}
-                            </button>
-                            <button class="small-btn" style="color:var(--danger)" onclick="window.deleteProject('${p.id}', event)">× Verwijder</button>
-                        </div>
-                    ` : ''}
+                    ${actionButtonsHtml}
                 `;
                 col.appendChild(div);
             });
@@ -1561,11 +1709,15 @@
     }
 
     function showDetail(p) {
+        const isPrivileged = (userRole === 'ADMIN' || userRole === 'EDITOR');
         document.getElementById('detail-modal').style.display = 'block';
         document.getElementById('detail-body').innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
                 <h1 style="font-size:2rem; font-weight:800; color:var(--primary); margin:0 0 1rem 0; line-height:1.2;">${p.naam}</h1>
-                ${isAdmin && p.isConcept ? '<span class="status-tag concept" style="font-size:0.8rem; padding:4px 10px;">🟠 Concept (niet live voor studenten)</span>' : ''}
+                <div style="display:flex; gap:8px; align-items:center;">
+                    ${isPrivileged && p.isConcept ? '<span class="status-tag concept" style="font-size:0.8rem; padding:4px 10px;">🟠 Concept (niet live voor studenten)</span>' : ''}
+                    ${userRole === 'EDITOR' ? `<button class="btn btn-accent" style="padding:0.45rem 0.9rem; font-size:0.8rem;" onclick="window.openEditorDescriptionModal('${p.id}', event)">📝 Omschrijving aanpassen</button>` : ''}
+                </div>
             </div>
             
             <div class="detail-meta-box">
@@ -1599,8 +1751,8 @@
     }
 
     function toggleAdmin() {
-        document.getElementById('admin-panel').style.display = isAdmin ? 'none' : 'block';
-        isAdmin = !isAdmin;
+        document.getElementById('admin-panel').style.display = 'none';
+        userRole = 'NONE';
         renderWeeks();
     }
 
@@ -1615,6 +1767,9 @@
     window.saveWeekDate = saveWeekDate;
     window.updateLogo = updateLogo;
     window.login = login;
+    window.logoutEditor = logoutEditor;
+    window.openEditorDescriptionModal = openEditorDescriptionModal;
+    window.saveEditorDescription = saveEditorDescription;
     window.saveProject = saveProject;
     window.editProject = editProject;
     window.togglePublishProject = togglePublishProject;
