@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- SheetJS voor Excel Import -->
+    <!-- SheetJS voor Excel Import & Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -252,13 +252,31 @@
             border: 1px solid #bbf7d0;
             border-radius: var(--radius-md);
             padding: 1.25rem;
-            margin-top: 1.5rem;
+            margin-top: 1rem;
         }
 
         .excel-import-box h4 {
             font-size: 0.95rem;
             font-weight: 800;
             color: #166534;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .excel-export-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .excel-export-box h4 {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #1e40af;
             margin-bottom: 0.5rem;
             display: flex;
             align-items: center;
@@ -450,6 +468,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
         .modal-header h2 {
@@ -474,7 +494,22 @@
             padding: 1.25rem 1rem; 
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem;
+            transition: background-color 0.2s ease;
+        }
+
+        .day-col.drag-over {
+            background: #eef5fc;
+            outline: 2px dashed var(--accent);
+            outline-offset: -4px;
+        }
+
+        .day-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            min-height: 480px;
+            flex: 1;
         }
 
         .day-head { 
@@ -503,6 +538,25 @@
             flex-direction: column;
             gap: 6px;
             border-left: 4px solid var(--accent);
+        }
+
+        .project-stub[draggable="true"] {
+            cursor: grab;
+        }
+
+        .project-stub[draggable="true"]:active {
+            cursor: grabbing;
+        }
+
+        .project-stub.dragging {
+            opacity: 0.45;
+            transform: scale(0.98);
+            border: 2px dashed var(--accent);
+        }
+
+        .project-stub.drop-target-above {
+            border-top: 3px solid var(--mondriaan-red);
+            margin-top: 4px;
         }
 
         .project-stub:hover { 
@@ -582,14 +636,15 @@
         .admin-actions { 
             display: flex; 
             flex-wrap: wrap;
-            gap: 6px; 
+            gap: 5px; 
             margin-top: 8px; 
             padding-top: 8px;
             border-top: 1px dashed var(--border);
+            align-items: center;
         }
 
         .small-btn { 
-            padding: 4px 8px; 
+            padding: 4px 7px; 
             font-size: 0.725rem; 
             border: 1px solid var(--border); 
             border-radius: 6px;
@@ -599,9 +654,48 @@
             background: #f8fafc;
             color: var(--text-main);
             transition: background 0.15s;
+            white-space: nowrap;
         }
 
         .small-btn:hover { background: #e2e8f0; }
+
+        .move-btn-group {
+            display: flex;
+            gap: 3px;
+            flex: 0 0 auto;
+        }
+
+        .move-btn {
+            padding: 4px 7px;
+            font-size: 0.725rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 800;
+            background: #eef5fc;
+            color: var(--accent);
+            transition: all 0.15s;
+        }
+
+        .move-btn:hover:not(:disabled) {
+            background: var(--accent);
+            color: #ffffff;
+        }
+
+        .move-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .drag-hint-badge {
+            font-size: 0.775rem;
+            background: #eef5fc;
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 700;
+            border: 1px solid var(--accent-light);
+        }
 
         /* Detail Modal */
         #detail-body { 
@@ -767,6 +861,17 @@
                     </button>
                 </div>
 
+                <!-- Excel Export / Back-up Box -->
+                <div class="excel-export-box">
+                    <h4>💾 Excel Back-up Exporteren</h4>
+                    <p style="font-size:0.8rem; color:#1e3a8a; margin-bottom:0.75rem;">
+                        Download alle huidige projecten (inclusief aangepaste omschrijvingen en volgorde) als Excel-bestand.
+                    </p>
+                    <button class="btn btn-accent" onclick="window.exportToExcel()" style="width:100%;">
+                        📥 Exporteer alles naar Excel (Back-up)
+                    </button>
+                </div>
+
                 <!-- Excel Import Box met Wis-optie per Week & GOEDKEUREN code -->
                 <div class="excel-import-box">
                     <h4>📊 Excel Projecten Importeren</h4>
@@ -908,15 +1013,20 @@
 <div id="agenda-modal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2 id="modal-week-title">WEEK OVERZICHT</h2>
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <h2 id="modal-week-title">WEEK OVERZICHT</h2>
+                <span id="drag-instruction-badge" class="drag-hint-badge" style="display:none;">
+                    ✋ Sleep blokjes om te verplaatsen of gebruik ▲ / ▼
+                </span>
+            </div>
             <button class="btn btn-secondary" onclick="window.closeModal('agenda-modal')">✕ Sluiten</button>
         </div>
         <div class="agenda-grid">
-            <div class="day-col"><div class="day-head">MAANDAG</div><div id="day-0"></div></div>
-            <div class="day-col"><div class="day-head">DINSDAG</div><div id="day-1"></div></div>
-            <div class="day-col"><div class="day-head">WOENSDAG</div><div id="day-2"></div></div>
-            <div class="day-col"><div class="day-head">DONDERDAG</div><div id="day-3"></div></div>
-            <div class="day-col"><div class="day-head">VRIJDAG</div><div id="day-4"></div></div>
+            <div class="day-col" data-day="0"><div class="day-head">MAANDAG</div><div id="day-0" class="day-list" data-day="0"></div></div>
+            <div class="day-col" data-day="1"><div class="day-head">DINSDAG</div><div id="day-1" class="day-list" data-day="1"></div></div>
+            <div class="day-col" data-day="2"><div class="day-head">WOENSDAG</div><div id="day-2" class="day-list" data-day="2"></div></div>
+            <div class="day-col" data-day="3"><div class="day-head">DONDERDAG</div><div id="day-3" class="day-list" data-day="3"></div></div>
+            <div class="day-col" data-day="4"><div class="day-head">VRIJDAG</div><div id="day-4" class="day-list" data-day="4"></div></div>
         </div>
     </div>
 </div>
@@ -972,8 +1082,8 @@
 
 <!-- Firebase SDK Integratie -->
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-analytics.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-analytics.js";
     import { 
         getFirestore, 
         doc, 
@@ -984,7 +1094,7 @@
         updateDoc, 
         deleteDoc,
         writeBatch
-    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBHhmtq1uyqyFtElt4Q3xxocQmQn7xrZfs",
@@ -1001,7 +1111,7 @@
     const dbFS = getFirestore(app);
 
     // Officieel SVG Weblogo van ROC Mondriaan
-    const MONDRIAAN_SVG_LOGO = "./logo.png";
+    const MONDRIAAN_SVG_LOGO = "https://www.rocmondriaan.nl/themes/custom/rocmondriaan/logo.svg";
 
     // Globale applicatiestaat
     let db = {
@@ -1018,6 +1128,15 @@
     let userRole = 'NONE';
     let activeWeekModal = null;
     let currentLoadedWorkbook = null;
+    let draggedProjectId = null;
+
+    // Hulpfunctie voor stabiele sortering binnen een dag
+    function sortDayProjects(a, b) {
+        const orderA = (a.order !== undefined && a.order !== null) ? Number(a.order) : 999999;
+        const orderB = (b.order !== undefined && b.order !== null) ? Number(b.order) : 999999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.tijd || '').localeCompare(b.tijd || '') || (a.naam || '').localeCompare(b.naam || '');
+    }
 
     // Synchroniseer Algemene Instellingen realtime vanuit Firestore
     onSnapshot(doc(dbFS, "settings", "global"), (docSnap) => {
@@ -1242,12 +1361,14 @@
         if (userRole !== 'ADMIN') return;
         const id = document.getElementById('edit-id').value;
         const classes = Array.from(document.querySelectorAll('input[name="p-classes"]:checked')).map(cb => cb.value);
+        const weekVal = parseInt(document.getElementById('p-week').value);
+        const dagVal = parseInt(document.getElementById('p-dag').value);
 
         const projectData = {
             naam: document.getElementById('p-naam').value.trim(),
             docent: document.getElementById('p-docent').value.trim(),
-            week: parseInt(document.getElementById('p-week').value),
-            dag: parseInt(document.getElementById('p-dag').value),
+            week: weekVal,
+            dag: dagVal,
             tijd: document.getElementById('p-tijd').value,
             loc: document.getElementById('p-loc').value,
             info: document.getElementById('p-info').value,
@@ -1263,6 +1384,9 @@
             if (id) {
                 await updateDoc(doc(dbFS, "projects", id), projectData);
             } else {
+                // Geef nieuw project een order-positie onderaan de gekozen dag
+                const dayProjects = db.projects.filter(p => p.week === weekVal && p.dag === dagVal);
+                projectData.order = dayProjects.length;
                 await addDoc(collection(dbFS, "projects"), projectData);
             }
             resetForm();
@@ -1367,9 +1491,232 @@
         document.getElementById('p-choice').checked = false;
         document.getElementById('p-concept').checked = false;
         document.getElementById('form-mode-text').innerText = "Nieuw Project";
-        document.getElementById('save-btn').innerText = "Project Publiceren";
+        document.getElementById('save-btn').innerText = "Project Opslaan";
         document.getElementById('cancel-edit').style.display = 'none';
         document.querySelectorAll('input[name="p-classes"]').forEach(cb => cb.checked = false);
+    }
+
+    // VERPLAATS PROJECT OMHOOG OF OMLAAG BINNEN DEZELFDE DAG (MET PIJLTJES ▲ / ▼)
+    async function moveProjectOrder(projectId, direction, e) {
+        if (e) e.stopPropagation();
+        if (userRole !== 'ADMIN') return;
+
+        const targetProj = db.projects.find(p => p.id === projectId);
+        if (!targetProj) return;
+
+        const filter = document.getElementById('student-filter').value;
+        // Haal alle zichtbare projecten op die dag op, gesorteerd op huidige volgorde
+        const dayProjects = db.projects
+            .filter(p => p.week === targetProj.week && p.dag === targetProj.dag)
+            .filter(p => filter === 'ALL' || !p.classes || p.classes.length === 0 || p.classes.includes(filter))
+            .sort(sortDayProjects);
+
+        const currentIndex = dayProjects.findIndex(p => p.id === projectId);
+        if (currentIndex === -1) return;
+
+        const swapIndex = currentIndex + direction;
+        if (swapIndex < 0 || swapIndex >= dayProjects.length) return;
+
+        // Wissel de twee items om in de array
+        const temp = dayProjects[currentIndex];
+        dayProjects[currentIndex] = dayProjects[swapIndex];
+        dayProjects[swapIndex] = temp;
+
+        // Schrijf de nieuwe order-indexen weg in één batch
+        try {
+            const batch = writeBatch(dbFS);
+            dayProjects.forEach((proj, idx) => {
+                batch.update(doc(dbFS, "projects", proj.id), { order: idx });
+            });
+            await batch.commit();
+        } catch (err) {
+            alert("Fout bij verplaatsen van project: " + err.message);
+        }
+    }
+
+    // DRAG & DROP HANDLERS VOOR VERPLAATSEN TUSSEN DAGEN OF BINNEN EEN DAG
+    function handleDragStart(e, projectId) {
+        if (userRole !== 'ADMIN') {
+            e.preventDefault();
+            return;
+        }
+        draggedProjectId = projectId;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', projectId);
+        setTimeout(() => {
+            if (e.target && e.target.classList) {
+                e.target.classList.add('dragging');
+            }
+        }, 0);
+    }
+
+    function handleDragEnd(e) {
+        if (e.target && e.target.classList) {
+            e.target.classList.remove('dragging');
+        }
+        document.querySelectorAll('.day-col').forEach(col => col.classList.remove('drag-over'));
+        document.querySelectorAll('.project-stub').forEach(card => card.classList.remove('drop-target-above'));
+        draggedProjectId = null;
+    }
+
+    async function handleDropOnDay(e, targetDay, targetBeforeProjectId = null) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        document.querySelectorAll('.day-col').forEach(col => col.classList.remove('drag-over'));
+        document.querySelectorAll('.project-stub').forEach(card => card.classList.remove('drop-target-above'));
+
+        if (userRole !== 'ADMIN' || !draggedProjectId || activeWeekModal === null) return;
+        if (draggedProjectId === targetBeforeProjectId) return;
+
+        const draggedProj = db.projects.find(p => p.id === draggedProjectId);
+        if (!draggedProj) return;
+
+        const sourceDay = draggedProj.dag;
+        const week = activeWeekModal;
+
+        // Haal projecten van de doeldag op (zonder het versleepte item)
+        const targetDayProjects = db.projects
+            .filter(p => p.week === week && p.dag === targetDay && p.id !== draggedProjectId)
+            .sort(sortDayProjects);
+
+        // Bepaal op welke positie het versleepte item ingevoegd moet worden
+        if (targetBeforeProjectId) {
+            const insertIdx = targetDayProjects.findIndex(p => p.id === targetBeforeProjectId);
+            if (insertIdx !== -1) {
+                targetDayProjects.splice(insertIdx, 0, draggedProj);
+            } else {
+                targetDayProjects.push(draggedProj);
+            }
+        } else {
+            targetDayProjects.push(draggedProj);
+        }
+
+        try {
+            const batch = writeBatch(dbFS);
+
+            // Werk de dag en nieuwe volgorde bij voor alle items op de doeldag
+            targetDayProjects.forEach((proj, idx) => {
+                batch.update(doc(dbFS, "projects", proj.id), {
+                    dag: targetDay,
+                    order: idx
+                });
+            });
+
+            // Als het item van een andere dag kwam, hernummer ook de overgebleven items op de brondag
+            if (sourceDay !== targetDay) {
+                const sourceDayProjects = db.projects
+                    .filter(p => p.week === week && p.dag === sourceDay && p.id !== draggedProjectId)
+                    .sort(sortDayProjects);
+                sourceDayProjects.forEach((proj, idx) => {
+                    batch.update(doc(dbFS, "projects", proj.id), { order: idx });
+                });
+            }
+
+            await batch.commit();
+        } catch (err) {
+            alert("Fout bij verplaatsen van project: " + err.message);
+        }
+    }
+
+    // Initialiseer drop-zones op de 5 dagkolommen
+    function setupAgendaDropZones() {
+        document.querySelectorAll('.day-col').forEach(col => {
+            const dayIdx = parseInt(col.getAttribute('data-day'));
+            
+            col.ondragover = (e) => {
+                if (userRole !== 'ADMIN' || !draggedProjectId) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                col.classList.add('drag-over');
+            };
+
+            col.ondragleave = (e) => {
+                if (!col.contains(e.relatedTarget)) {
+                    col.classList.remove('drag-over');
+                }
+            };
+
+            col.ondrop = (e) => {
+                handleDropOnDay(e, dayIdx, null);
+            };
+        });
+    }
+
+    // EXPORTEER ALLE PROJECTEN NAAR EXCEL BACK-UP (1-OP-1 HERIMPORTEERBAAR)
+    function exportToExcel() {
+        if (userRole !== 'ADMIN') return;
+
+        if (!db.projects || db.projects.length === 0) {
+            alert("Er zijn momenteel geen projecten in de database om te exporteren.");
+            return;
+        }
+
+        const dagenNamen = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag'];
+
+        // Sorteer projecten chronologisch op Week, Dag en eigen ingestelde volgorde
+        const sortedProjects = [...db.projects].sort((a, b) => {
+            if (a.week !== b.week) return a.week - b.week;
+            if (a.dag !== b.dag) return a.dag - b.dag;
+            return sortDayProjects(a, b);
+        });
+
+        // Zet data om naar exact dezelfde kolomnamen als de import verwacht
+        const mapProjectToRow = (p) => ({
+            'Week': p.week,
+            'Dag': dagenNamen[p.dag] || 'Maandag',
+            'Volgorde': (p.order !== undefined && p.order !== null) ? p.order + 1 : '',
+            'Naam': p.naam || '',
+            'Verantwoordelijke docent': p.docent || '',
+            'Tijd': p.tijd || '',
+            'Locatie': p.loc || '',
+            'Klassen': (p.classes && p.classes.length > 0) ? p.classes.join(', ') : '',
+            'Keuze': p.choice ? 'Ja' : 'Nee',
+            'Status': p.isConcept ? 'Concept' : 'Definitief',
+            'Omschrijving project': p.info || '',
+            'Foto': p.img || '',
+            'Video': p.vid || '',
+            'Link': p.link || ''
+        });
+
+        const wb = XLSX.utils.book_new();
+
+        // Tabblad 1: Alle projecten samen (handig voor volledige restore)
+        const allRows = sortedProjects.map(mapProjectToRow);
+        const wsAll = XLSX.utils.json_to_sheet(allRows);
+        
+        wsAll['!cols'] = [
+            { wch: 8 },  // Week
+            { wch: 12 }, // Dag
+            { wch: 10 }, // Volgorde
+            { wch: 32 }, // Naam
+            { wch: 24 }, // Docent
+            { wch: 15 }, // Tijd
+            { wch: 20 }, // Locatie
+            { wch: 25 }, // Klassen
+            { wch: 10 }, // Keuze
+            { wch: 12 }, // Status
+            { wch: 55 }, // Omschrijving
+            { wch: 25 }, // Foto
+            { wch: 25 }, // Video
+            { wch: 25 }  // Link
+        ];
+        XLSX.utils.book_append_sheet(wb, wsAll, "Alle Projecten");
+
+        // Extra tabbladen per week
+        const uniqueWeeks = [...new Set(sortedProjects.map(p => p.week))].sort((a, b) => a - b);
+        uniqueWeeks.forEach(w => {
+            const weekRows = sortedProjects.filter(p => p.week === w).map(mapProjectToRow);
+            const wsWeek = XLSX.utils.json_to_sheet(weekRows);
+            wsWeek['!cols'] = wsAll['!cols'];
+            XLSX.utils.book_append_sheet(wb, wsWeek, `Week ${w}`);
+        });
+
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        const fileName = `Projectplanner_Backup_${dateStr}.xlsx`;
+
+        XLSX.writeFile(wb, fileName);
     }
 
     // LEES DE WERKBLADEN UIT VOOR SELECTIE DROPDOWN
@@ -1543,12 +1890,17 @@
 
                 const docentVal = row[getKey('verantwoordelijke docent') || getKey('docent') || getKey('docenten') || ''];
                 const infoVal = row[getKey('omschrijving project') || getKey('omschrijving') || getKey('info') || getKey('extra informatie') || ''];
+                const volgordeVal = row[getKey('volgorde') || getKey('order')];
+                const parsedOrder = (volgordeVal !== undefined && volgordeVal !== null && !isNaN(parseInt(volgordeVal))) 
+                    ? parseInt(volgordeVal) - 1 
+                    : i;
 
                 parsedRows.push({
                     naam: naamClean,
                     docent: String(docentVal || '').trim(),
                     week: week,
                     dag: dag,
+                    order: parsedOrder,
                     classes: rowClasses,
                     tijd: String(row[getKey('tijd')] || '').trim(),
                     loc: String(row[getKey('locatie') || getKey('loc')] || '').trim(),
@@ -1650,27 +2002,40 @@
         const filter = document.getElementById('student-filter').value;
         const isPrivileged = (userRole === 'ADMIN' || userRole === 'EDITOR');
         
+        document.getElementById('drag-instruction-badge').style.display = (userRole === 'ADMIN') ? 'inline-block' : 'none';
         document.getElementById('modal-week-title').innerText = filter !== 'ALL' 
             ? `WEEK ${w} PLANNING - KLAS ${filter}`
             : `WEEK ${w} PLANNING`;
 
+        setupAgendaDropZones();
+
         for (let i = 0; i < 5; i++) {
             const col = document.getElementById('day-' + i);
             col.innerHTML = '';
-            db.projects.filter(p => p.week == w && p.dag == i).forEach(p => {
-                // Studenten zien geen concepten; beheerders en redacteuren zien ze wel
-                if (!isPrivileged && p.isConcept) return;
-                if (filter !== 'ALL' && p.classes && p.classes.length > 0 && !p.classes.includes(filter)) return;
 
+            // Filter en sorteer de projecten van deze dag op ingestelde volgorde
+            const dayProjects = db.projects
+                .filter(p => p.week == w && p.dag == i)
+                .filter(p => isPrivileged || !p.isConcept)
+                .filter(p => filter === 'ALL' || !p.classes || p.classes.length === 0 || p.classes.includes(filter))
+                .sort(sortDayProjects);
+
+            dayProjects.forEach((p, idx) => {
                 let actionButtonsHtml = '';
                 if (userRole === 'ADMIN') {
+                    const isFirst = idx === 0;
+                    const isLast = idx === dayProjects.length - 1;
                     actionButtonsHtml = `
                         <div class="admin-actions">
-                            <button class="small-btn" onclick="window.editProject('${p.id}', event)">✎ Bewerken</button>
+                            <button class="small-btn" onclick="window.editProject('${p.id}', event)">✎ Bewerk</button>
                             <button class="small-btn" style="color:${p.isConcept ? 'var(--badge-definitief)' : 'var(--badge-concept)'}" onclick="window.togglePublishProject('${p.id}', event)">
-                                ${p.isConcept ? '🚀 Publiceren' : '↩ Concept'}
+                                ${p.isConcept ? '🚀 Live' : '↩ Concept'}
                             </button>
-                            <button class="small-btn" style="color:var(--danger)" onclick="window.deleteProject('${p.id}', event)">× Verwijder</button>
+                            <div class="move-btn-group">
+                                <button class="move-btn" title="Omhoog verplaatsen" ${isFirst ? 'disabled' : ''} onclick="window.moveProjectOrder('${p.id}', -1, event)">▲</button>
+                                <button class="move-btn" title="Omlaag verplaatsen" ${isLast ? 'disabled' : ''} onclick="window.moveProjectOrder('${p.id}', 1, event)">▼</button>
+                            </div>
+                            <button class="small-btn" style="color:var(--danger); flex:0 0 auto;" title="Verwijderen" onclick="window.deleteProject('${p.id}', event)">×</button>
                         </div>
                     `;
                 } else if (userRole === 'EDITOR') {
@@ -1686,6 +2051,27 @@
                 const div = document.createElement('div');
                 div.className = `project-stub ${p.choice ? 'is-choice' : ''} ${p.isConcept ? 'is-concept' : ''}`;
                 div.onclick = () => showDetail(p);
+
+                // Drag & Drop alleen actief voor Hoofdbeheerder
+                if (userRole === 'ADMIN') {
+                    div.setAttribute('draggable', 'true');
+                    div.ondragstart = (e) => handleDragStart(e, p.id);
+                    div.ondragend = handleDragEnd;
+                    
+                    div.ondragover = (e) => {
+                        if (!draggedProjectId || draggedProjectId === p.id) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        div.classList.add('drop-target-above');
+                    };
+                    div.ondragleave = () => {
+                        div.classList.remove('drop-target-above');
+                    };
+                    div.ondrop = (e) => {
+                        handleDropOnDay(e, i, p.id);
+                    };
+                }
+
                 div.innerHTML = `
                     <div class="badge-bar">
                         ${p.choice ? '<div class="choice-tag">Keuze</div>' : ''}
@@ -1776,11 +2162,13 @@
     window.publishAllConcepts = publishAllConcepts;
     window.deleteProject = deleteProject;
     window.resetForm = resetForm;
+    window.moveProjectOrder = moveProjectOrder;
     window.openAgenda = openAgenda;
     window.toggleAdmin = toggleAdmin;
     window.closeModal = closeModal;
     window.loadExcelSheets = loadExcelSheets;
     window.importExcel = importExcel;
+    window.exportToExcel = exportToExcel;
 </script>
 
 </body>
